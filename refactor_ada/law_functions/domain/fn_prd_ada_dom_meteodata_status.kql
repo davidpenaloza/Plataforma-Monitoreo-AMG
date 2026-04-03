@@ -1,0 +1,542 @@
+// Source variable: var_mlp_ada_meteodata
+// Purpose: preserve exact functional behavior from current dashboard variable.
+let fn_prd_ada_dom_meteodata_status = (startTime:datetime, endTime:datetime) {
+let statusFuentes = view() {
+    let startQuery = bin(startTime, 1m);
+    let endQuery = bin(endTime, 1m);
+    let mapContainerJobs_MLP_ADA_Refactor = dynamic(
+        {
+            "mlp-prd-caj-meteo-job01": "job01_meteo",
+            "mlp-prd-caj-meteo-job02": "job02_meteo",
+            "mlp-prd-caj-pisystem-job01": "job01_pisystem",
+            "mlp-prd-caj-pisystem-job02": "job02_pisystem",
+            "mlp-prd-caj-plans-job01": "job01_plans",
+            "DISPATCH": "ADF_dispatch_ingestion",
+            "DRILLIT": "ADF_drillit_ingestion",
+            "BLOCKGRADE": "ADF_blockgrade_ingestion"
+        });
+    let mapUmbralAlerta = dynamic(
+        {
+            "mlp-prd-caj-meteo-job01": 35,
+            "mlp-prd-caj-meteo-job02": 35,
+            "mlp-prd-caj-pisystem-job01": 25,
+            "mlp-prd-caj-pisystem-job02": 25,
+            "mlp-prd-caj-plans-job01": 25,
+            "DISPATCH": 35,
+            "DRILLIT": 35,
+            "BLOCKGRADE": 60
+        });
+    let umbralDataset =
+        range dummy from 1 to 1 step 1
+        | extend values = mapUmbralAlerta
+        | mv-expand values
+        | extend value = todouble(replace_string(tostring(split(values, ":")[1]), "}", ""))
+        | sort by value desc
+        | project value
+        | take 1;
+    let maxUmbral = toscalar(umbralDataset);
+    let get_container_sources_data = view() { 
+    let bins_expected_logs = view() { 
+        range TimeGeneratedBin_Chile from startQuery - totimespan(maxUmbral * 60s) to endQuery step 1m
+        | extend TimeGeneratedBin_Chile = bin(TimeGeneratedBin_Chile, 1m)
+        | extend ["expected_mlp-prd-caj-meteo-job01"] = iff(datetime_part("minute", TimeGeneratedBin_Chile) % 15 == 0, 1, 0),
+                ["expected_mlp-prd-caj-meteo-job02"] = iff(datetime_part("minute", TimeGeneratedBin_Chile) in (1, 16, 31, 46), 1, 0),
+                ["expected_mlp-prd-caj-pisystem-job01"] = 1,
+                ["expected_mlp-prd-caj-pisystem-job02"] = iff(datetime_part("minute", TimeGeneratedBin_Chile) in (1, 11, 21, 31, 41, 51), 1, 0),
+                ["expected_mlp-prd-caj-plans-job01"] = iff(datetime_part("minute", TimeGeneratedBin_Chile) == 46 and datetime_part("hour", TimeGeneratedBin_Chile) in (0,1,6,13,17,18,19),1, 0),
+                ["expected_DISPATCH"] = iff(datetime_part("minute", TimeGeneratedBin_Chile) in (6, 16, 26, 36, 46, 56), 1, 0),
+                ["expected_DRILLIT"] = iff(datetime_part("minute", TimeGeneratedBin_Chile) in (1, 11, 21, 31, 41, 51), 1, 0),
+                ["expected_BLOCKGRADE"] = iff(datetime_part("minute", TimeGeneratedBin_Chile) in (2,32), 1, 0)
+        | project TimeGeneratedBin_Chile, allValues=pack_all()
+        | mv-expand allValues
+        | extend nombreEsperado = tostring(bag_keys(allValues)[0])
+        | extend valorEsperado = toint(allValues[nombreEsperado])
+        | project-away allValues
+        | where nombreEsperado startswith "expected_"
+    };
+    let bins_real_data = view() {
+        let Filtered_ContainerAppSystemLogs_CL = view() { 
+            ContainerAppSystemLogs_CL
+            | where TimeGenerated >= startQuery - totimespan(maxUmbral * 60s) and TimeGenerated < endQuery and JobName_s startswith "mlp-prd-"
+            | where Log_s contains "has successfully completed"// or Log_s contains "has exited with status Failed"
+            | project TimeGenerated, nombreReal = JobName_s, valorReal = 1
+        };
+    let Filtered_PipelineRuns = view() {
+    AzureDiagnostics
+        | where TimeGenerated >= startQuery - totimespan(maxUmbral * 60s) and TimeGenerated < endQuery
+        | where Category == "PipelineRuns" 
+        | where OperationName in ("PL_FULL - Succeeded", "PL_BLOCKGRADE - Succeeded")
+        | extend nombreReal = iff(ResourceGroup == "MLP-PRD-RG-BLKGRDE", "BLOCKGRADE", replace_string(ResourceGroup, "MLP-PRD-RG-", ""))
+        | project TimeGenerated, nombreReal, valorReal = 1
+    };
+        let bins_union_data = view() { 
+            union Filtered_ContainerAppSystemLogs_CL, Filtered_PipelineRuns
+            | summarize valorReal = sum(valorReal) by nombreReal, TimeGeneratedBin_Chile = bin(TimeGenerated, totimespan(1 * 60s))
+            | project nombreReal, valorReal, TimeGeneratedBin_Chile
+            | order by TimeGeneratedBin_Chile asc
+            | extend nombreEsperado=strcat("expected_", nombreReal)
+        };
+        bins_union_data
+    };
+    let join_std_data = view() { 
+        bins_expected_logs
+        | join kind=leftouter (bins_real_data) on TimeGeneratedBin_Chile, nombreEsperado
+        | project-away TimeGeneratedBin_Chile1, nombreEsperado1
+        | extend nombreReal = replace_string(nombreEsperado, "expected_", "")
+        | extend valorReal = coalesce(valorReal, 0)
+    };
+    join_std_data
+    };
+    let valoresAcumulados = view() {
+        get_container_sources_data
+            | extend ["umbralAlerta"] = mapUmbralAlerta[nombreReal]
+            | extend range = range(TimeGeneratedBin_Chile, TimeGeneratedBin_Chile + totimespan(todouble(umbralAlerta) * 60s), 1m)
+            | mv-expand range to typeof(datetime)
+            | summarize ["valorAccReal"]=sum(["valorReal"]),
+                        ["valorAccEsperado"]=sum(["valorEsperado"])
+                        by TimeGeneratedBin_Chile=range, ["nombreReal"]
+            | where TimeGeneratedBin_Chile < endQuery
+            | order by TimeGeneratedBin_Chile desc
+            | extend ["status"] = iff(["valorAccReal"] == 0 and ["valorAccEsperado"] != 0, "a", "-")
+    };
+    let result = view() { 
+        get_container_sources_data
+            | join kind=leftouter valoresAcumulados on TimeGeneratedBin_Chile, nombreReal
+            | summarize ["status"]=iff(countif(["status"] == "a") > 0, "a", "-"),
+                        ["valorReal"] = sum(["valorReal"]),
+                        ["valorEsperado"] = sum(["valorEsperado"]),
+                        ["nombreEsperado"] = take_any(["nombreEsperado"])
+                by TimeGeneratedBin_Chile=bin(TimeGeneratedBin_Chile, totimespan(15 * 60s)), ["nombreReal"]
+            // Formato ejecuciones_correctas/ejecuciones_totales. ej: 0/1
+            | extend ["status"] = case(
+                                    // ["valorEsperado"] == 0, "n",
+                                    ["status"] == "a", "a",
+                                    ["valorReal"] > ["valorEsperado"], "s",
+                                    ["valorReal"] < ceiling(0.85*["valorEsperado"]), "w",
+                                    "n")
+            | extend ["status"] = strcat(["status"], ["valorReal"], "/", ["valorEsperado"])
+            | project TimeGeneratedBin_Chile, nombreReal, status
+            | where TimeGeneratedBin_Chile >= startQuery and TimeGeneratedBin_Chile < endQuery
+            | extend nombreReal = tostring(mapContainerJobs_MLP_ADA_Refactor[nombreReal])
+            | evaluate pivot(nombreReal, take_any(status), TimeGeneratedBin_Chile)
+    };
+    result
+      | project TimeGeneratedBin_Chile, job01_meteo, job02_meteo, job01_pisystem, job02_pisystem, job01_plans, ADF_dispatch_ingestion, ADF_drillit_ingestion, ADF_blockgrade_ingestion 
+};
+// ######################## ULTIMA ACTUALIZACION FUENTES ####################################
+let ultimaActualizacionFuentes = view() {
+  let mapUmbralAlerta = dynamic(
+    {
+      "pisystem_interpolated": 20,
+      "pisystem_recorded": 1460,
+      "dispatch_tiempos": 60,
+      "dispatch_shiftdumps": 60,
+      "dispatch_shiftloads": 60,
+      "dispatch_shiftloads2": 60,
+      "dispatch_shiftstate": 60,
+      "drillit_drillings": 600,
+      "drillit_drill_state_history": 600,
+      "meteodata": 180,
+      "blockgrade_bybucket": 90,
+      "planes_semanales_AXB": 1440, //no se ocupa
+      "planes_semanales_PLANTA_CONCENTRADORA_RECUPERACION_CU": 1440,
+      "planes_semanales_LEY_CONCENTRADO_CU": 1440,
+      "planes_semanales_TRANSPORTADO_STMG":1440,
+      "planes_semanales_CONCENTRADO_PRODUCIDO":1440,
+      "planes_semanales_PLANTA_CONCENTRADORA_LEY_CU":1440,
+      "planes_semanales_PLANTA_CONCENTRADORA_CU_FINO_PRODUCIDO":1440,
+      "planes_semanales_PLANTA_CONCENTRADORA_MO_FINO_PRODUCIDO":1440,
+      "planes_semanales_PLANTA_CONCENTRADORA_TRATAMIENTO":1440,
+      "planes_semanales_PUERTO_CU_FINO_FILTRADO_PAGABLE":1440,
+      "planes_acc_mensuales_TRANSPORTADO_STMG":2100,
+      "planes_acc_mensuales_AXB":2100, //no se ocupa
+      "planes_acc_mensuales_REMANEJO_A_CH":2100, //no se ocupa
+      "planes_acc_mensuales_REMANEJO_A_BOTADERO":2100, //no se ocupa
+      "planes_acc_mensuales_CONCENTRADO_PRODUCIDO":2100,
+      "planes_acc_mensuales_PLANTA_CONCENTRADORA_LEY_CU":2100,
+      "planes_acc_mensuales_LEY_CONCENTRADO_CU":2100,
+      "planes_acc_mensuales_PUERTO_CU_FINO_FILTRADO_PAGABLE":2100,
+      "planes_acc_mensuales_PLANTA_CONCENTRADORA_TRATAMIENTO":2100,
+      "planes_acc_mensuales_EXTRACCION_MINA":2100,
+      "planes_acc_mensuales_PLANTA_CONCENTRADORA_CU_FINO_PRODUCIDO":2100,
+      "planes_acc_mensuales_PLANTA_CONCENTRADORA_MO_FINO_PRODUCIDO":2100,
+      "planes_acc_mensuales_PLANTA_CONCENTRADORA_RECUPERACION_CU":2100,
+      "planes_mensuales":2100, //no se ocupa
+      "plan_diario":2100 //no se ocupa
+    });
+
+  ContainerAppConsoleLogs_CL
+      | where TimeGenerated >= bin(startTime, 1m) and TimeGenerated < bin(endTime, 1m)
+      | where ContainerGroupName_s startswith 'mlp-prd-caj-ada-job02'
+      | where Log_s startswith '{"fecha'
+      | project TimeGenerated, parse_json(Log_s)
+      | project TimeGenerated, mensaje = Log_s.mensaje, fecha_log_UTC = todatetime(Log_s.fecha_log_UTC)
+      | where mensaje startswith "timestamp_"
+      | extend ultimo_timestamp_str = substring(mensaje, indexof(mensaje, ": ") + 2, 19)
+      | extend ultimo_timestamp = todatetime(ultimo_timestamp_str)
+      | extend tabla = replace_string(replace_string(substring(mensaje, 10, indexof(mensaje, ": ") - 10), "last_record_", ""), "last_reg_", "")
+      | extend ultimo_timestamp = datetime_local_to_utc(ultimo_timestamp, 'America/Santiago')
+      | extend diff_minutos = round(datetime_diff("second", fecha_log_UTC, ultimo_timestamp) / 60.0, 1)
+      | extend hora_actual = datetime_part("hour", now())
+      | extend umbralAlertaOriginal = mapUmbralAlerta[tabla]
+      | extend umbralAlerta = case(
+          tabla in ("planes_mensuales", "plan_diario") and hora_actual < 10, umbralAlertaOriginal + 180,
+          umbralAlertaOriginal)
+      | extend Alertar = iff(diff_minutos > umbralAlerta or isempty(diff_minutos), true, false) //UPDT 19/08, ahora considera nulos.
+      | order by TimeGenerated desc, tabla desc
+      | project TimeGenerated, tabla, diff_minutos, Alertar
+      | summarize Max_DiffMinutos = max(diff_minutos), Alertar = max(Alertar)
+          by tabla, TimeGeneratedBin_Chile = bin(TimeGenerated, totimespan(15 * 60s))
+      };
+// ######################## JOBS ADA ####################################
+let statusKpisAlarms = view() {
+    let startQuery = bin(startTime, 1m);
+    let endQuery = bin(endTime, 1m);
+    let mapContainerJobs_MLP_ADA_Refactor = dynamic(
+        {
+            "mlp-prd-caj-ada-job01": "job01_transporte_fluidos",
+            "mlp-prd-caj-ada-job02": "job02_indicadores_generales",
+            "mlp-prd-caj-ada-job03": "job03_indicadores_globales",
+            "mlp-prd-caj-ada-job04": "job04_stock_chacay",
+            "mlp-prd-caj-ada-job05": "job05_servicios_mina",
+            "mlp-prd-caj-ada-job06": "job06_alarms-operational-parameters",
+            "mlp-prd-caj-ada-job07": "job07_alarms-service",
+            "mlp-prd-caj-ada-job08": "job08_chancado",
+            "mlp-prd-caj-ada-job09": "job09_carguio",
+            "mlp-prd-caj-ada-job10": "job10_flotacion",
+            "mlp-prd-caj-ada-job11": "job11_molienda",
+            "mlp-prd-caj-ada-job12": "job12_puerto",
+            "mlp-prd-caj-ada-job13": "job13_transporte",
+            "mlp-prd-caj-ada-job14": "job14_desaladora"
+        });
+    let mapUmbralAlerta = dynamic(
+        {
+            "mlp-prd-caj-ada-job01": 10,
+            "mlp-prd-caj-ada-job02": 10,
+            "mlp-prd-caj-ada-job03": 10,
+            "mlp-prd-caj-ada-job04": 10,
+            "mlp-prd-caj-ada-job05": 10,
+            "mlp-prd-caj-ada-job06": 35,
+            "mlp-prd-caj-ada-job07": 10, //updt 02/10
+            "mlp-prd-caj-ada-job08": 10,
+            "mlp-prd-caj-ada-job09": 10,
+            "mlp-prd-caj-ada-job10": 10,
+            "mlp-prd-caj-ada-job11": 10,
+            "mlp-prd-caj-ada-job12": 10,
+            "mlp-prd-caj-ada-job13": 10,
+            "mlp-prd-caj-ada-job14": 10
+        });
+    let umbralDataset =
+        range dummy from 1 to 1 step 1
+        | extend values = mapUmbralAlerta
+        | mv-expand values
+        | extend value = todouble(replace_string(tostring(split(values, ":")[1]), "}", ""))
+        | sort by value desc
+        | project value
+        | take 1;
+    let maxUmbral = toscalar(umbralDataset);
+    let get_container_ada_data = view() { 
+        let bins_expected_logs = view() { 
+            range TimeGeneratedBin_Chile from startQuery - totimespan(maxUmbral * 60s) to endQuery step 1m
+            | extend TimeGeneratedBin_Chile = bin(TimeGeneratedBin_Chile, 1m)
+            | extend ["expected_mlp-prd-caj-ada-job01"] = 1,
+                    ["expected_mlp-prd-caj-ada-job02"] = 1,
+                    ["expected_mlp-prd-caj-ada-job03"] = 1,
+                    ["expected_mlp-prd-caj-ada-job04"] = 1,
+                    ["expected_mlp-prd-caj-ada-job05"] = 1,
+                    ["expected_mlp-prd-caj-ada-job06"] = iff(datetime_part("minute", TimeGeneratedBin_Chile) in (0, 10, 20, 30, 40, 50), 1, 0),
+                    ["expected_mlp-prd-caj-ada-job07"] = 1,
+                    ["expected_mlp-prd-caj-ada-job08"] = 1,
+                    ["expected_mlp-prd-caj-ada-job09"] = 1,
+                    ["expected_mlp-prd-caj-ada-job10"] = 1,
+                    ["expected_mlp-prd-caj-ada-job11"] = 1,
+                    ["expected_mlp-prd-caj-ada-job12"] = 1,
+                    ["expected_mlp-prd-caj-ada-job13"] = 1,
+                    ["expected_mlp-prd-caj-ada-job14"] = 1
+            | project TimeGeneratedBin_Chile, allValues=pack_all()
+                | mv-expand allValues
+                | extend nombreEsperado = tostring(bag_keys(allValues)[0])
+                | extend valorEsperado = toint(allValues[nombreEsperado])
+                | project-away allValues
+                | where nombreEsperado startswith "expected_"
+        };
+        let get_detalle_container_jobs = view() {
+            ContainerAppSystemLogs_CL
+                | where TimeGenerated >= startQuery - totimespan(maxUmbral * 60s) and TimeGenerated < endQuery
+                | where JobName_s startswith 'mlp-prd-caj-ada-job'
+                | where Reason_s == 'Completed' 
+                | where Log_s contains "has successfully completed"
+                | extend valorReal = 1
+                | summarize valorReal = sum(valorReal) by JobName_s, TimeGeneratedBin_Chile = bin(TimeGenerated, totimespan(1 * 60s))
+                | project TimeGeneratedBin_Chile, nombreReal=JobName_s, valorReal
+                | extend nombreEsperado=strcat("expected_", nombreReal)
+        };
+        let join_std_data = view() { 
+            bins_expected_logs
+            | join kind=leftouter (get_detalle_container_jobs) on TimeGeneratedBin_Chile, nombreEsperado
+            | project-away TimeGeneratedBin_Chile1, nombreEsperado1
+            | extend nombreReal = replace_string(nombreEsperado, "expected_", "")
+            | extend valorReal = coalesce(valorReal, 0)
+        };
+        join_std_data
+    };
+    let valoresAcumulados = view() {
+        get_container_ada_data
+            | extend ["umbralAlerta"] = mapUmbralAlerta[nombreReal]
+            | extend range = range(TimeGeneratedBin_Chile, TimeGeneratedBin_Chile + totimespan(todouble(umbralAlerta) * 60s), 1m)
+            | mv-expand range to typeof(datetime)
+            | summarize ["valorAccReal"]=sum(["valorReal"]),
+                        ["valorAccEsperado"]=sum(["valorEsperado"])
+                        by TimeGeneratedBin_Chile=range, ["nombreReal"]
+            | where TimeGeneratedBin_Chile < endQuery
+            | order by TimeGeneratedBin_Chile desc
+            | extend ["status"] = iff(["valorAccReal"] == 0 and ["valorAccEsperado"] != 0, "a", "-")
+    };
+    let result = view() { 
+        get_container_ada_data
+            | join kind=leftouter valoresAcumulados on TimeGeneratedBin_Chile, nombreReal
+            | summarize ["status"]=iff(countif(["status"] == "a") > 0, "a", "-"),
+                        ["valorReal"] = sum(["valorReal"]),
+                        ["valorEsperado"] = sum(["valorEsperado"]),
+                        ["nombreEsperado"] = take_any(["nombreEsperado"])
+                by TimeGeneratedBin_Chile=bin(TimeGeneratedBin_Chile, totimespan(15 * 60s)), ["nombreReal"]
+            // Formato ejecuciones_correctas/ejecuciones_totales. ej: 0/1
+            | extend ["status"] = case(
+                                    // ["valorEsperado"] == 0, "n",
+                                    ["status"] == "a", "a",
+                                    ["valorReal"] > ["valorEsperado"], "s",
+                                    ["valorReal"] < ceiling(0.85*["valorEsperado"]), "w",
+                                    "n")
+            | extend ["status"] = strcat(["status"], ["valorReal"], "/", ["valorEsperado"])
+            | project TimeGeneratedBin_Chile, nombreReal, status
+            | where TimeGeneratedBin_Chile >= startQuery and TimeGeneratedBin_Chile < endQuery
+            | extend nombreReal = tostring(mapContainerJobs_MLP_ADA_Refactor[nombreReal])
+            | evaluate pivot(nombreReal, take_any(status), TimeGeneratedBin_Chile)
+    };
+    result
+        | project ["TimeGeneratedBin_Chile"], ["job01_transporte_fluidos"], ["job02_indicadores_generales"], ["job03_indicadores_globales"], ["job04_stock_chacay"], ["job05_servicios_mina"], ["job06_alarms-operational-parameters"], ["job07_alarms-service"], ["job08_chancado"], ["job09_carguio"], ["job10_flotacion"], ["job11_molienda"], ["job12_puerto"], ["job13_transporte"], ["job14_desaladora"]
+};
+// ######################## Obtencion KPIs sin datos #################################
+let get_detalle_kpis_sin_datos = (inicioFecha: datetime, finFecha: datetime)
+{
+    // Variables
+    let CurrentTimeChile = datetime_utc_to_local(now(), 'America/Santiago');
+    let CurrentTimeChileWeekDay = dayofweek(CurrentTimeChile) / 1d;
+    let CurrentTimeChileHour = datetime_part("hour", CurrentTimeChile);
+    let CurrentTimeChileMinute = datetime_part("minute", CurrentTimeChile);
+    // 
+    // Condiciones KPIs sin datos
+    // KPIs que se espera que siempre esten sin datos
+    let condicion_1_SinDatosPermanentes = True;
+    // KPIS sin datos de 7.00 a 10.00
+    let condicion_2_0700_a_1000 = CurrentTimeChileHour >= 7 and CurrentTimeChileHour < 10;
+    // KPIS sin datos de 19.00 a 21.00
+    let condicion_3_1900_a_2100 = CurrentTimeChileHour >= 19 and CurrentTimeChileHour < 21;
+    // KPIS sin datos de miercoles 19.00 a viernes 9.00 horas
+    let condicion_4_miercoles_1900_a_viernes_2100 = (CurrentTimeChileWeekDay == 3 and CurrentTimeChileHour >= 19)
+                                    or (CurrentTimeChileWeekDay == 4)
+                                    or (CurrentTimeChileWeekDay == 5 and CurrentTimeChileHour < 9);
+    // Kpis Sin datos fuera de horario laboral
+    let condicion_5_fuera_horario_laboral = (CurrentTimeChileWeekDay == 6 or CurrentTimeChileWeekDay == 7)
+                                            or (CurrentTimeChileHour < 9)
+                                            or (CurrentTimeChileHour >= 19);
+    // Kpis Sin datos de jueves 21.00 a viernes 10.30 horas
+    let condicion_6_jueves_2100_a_viernes_1030 = (CurrentTimeChileWeekDay == 4 and CurrentTimeChileHour >= 21)
+                                                    or (CurrentTimeChileWeekDay == 5 and CurrentTimeChileHour <= 8)
+                                                    or (CurrentTimeChileWeekDay == 5 and CurrentTimeChileHour == 8 and CurrentTimeChileMinute < 30);
+
+    // Kpis sin datos 9am:
+    let condicion_7_0900_a_0930 = CurrentTimeChileHour >= 9 and CurrentTimeChileHour < 10;
+
+    // Kpis sin datos 9pm:
+    let condicion_8_2100_a_2130 = CurrentTimeChileHour >= 21 and CurrentTimeChileHour < 22;
+
+    ContainerAppConsoleLogs_CL
+        | where TimeGenerated >= inicioFecha and TimeGenerated < finFecha
+        | where ContainerJobName_s startswith 'mlp-prd-caj-ada-job' and not(ContainerJobName_s startswith 'mlp-prd-caj-ada-job07')
+        | project TimeGenerated, ContainerJobName_s, Log_s
+        | where Log_s startswith '{"fecha_log_UTC":'
+        | extend ParsedJson = parse_json(Log_s)
+        | evaluate bag_unpack(ParsedJson)
+        | where log_nivel == "ERROR"
+        | extend root_error_line = tostring(split(traceback, "\n")[3])
+        | extend kpi_name = replace_string(extract(", in (.+)$", 1, root_error_line), "get_", "")
+         // Se filtran los nombres de los kpis que es esperado que esten sin datos.
+        | extend ["KPIs No esperados"] = tostring(["kpi_name"])
+
+        | extend ["KPIs No esperados"] = iff(condicion_7_0900_a_0930, iff(["KPIs No esperados"] in ("numero_wheeldozers_operando_real","numero_wheeldozers_disponible_real","numero_wheeldozers_nominal","numero_excavadora_operando_real","numero_excavadora_disponible_real","numero_excavadora_nominal","numero_aljibes_operando_real","numero_aljibes_disponible_real","numero_aljibes_nominal","numero_motoniveladora_operando_real","numero_motoniveladora_disponible_real","numero_motoniveladora_nominal","numero_bulldozer_operando_real","numero_bulldozer_disponible_real","numero_bulldozer_nominal","numero_cargador_frontal_operando_real","numero_cargador_frontal_disponible_real","numero_cargador_frontal_nominal"),  "", ["KPIs No esperados"]), ["KPIs No esperados"])
+        | extend ["KPIs No esperados"] = iff(condicion_8_2100_a_2130, iff(["KPIs No esperados"] in ("numero_wheeldozers_operando_real","numero_wheeldozers_disponible_real","numero_wheeldozers_nominal","numero_excavadora_operando_real","numero_excavadora_disponible_real","numero_excavadora_nominal","numero_aljibes_operando_real","numero_aljibes_disponible_real","numero_aljibes_nominal","numero_motoniveladora_operando_real","numero_motoniveladora_disponible_real","numero_motoniveladora_nominal","numero_bulldozer_operando_real","numero_bulldozer_disponible_real","numero_bulldozer_nominal","numero_cargador_frontal_operando_real","numero_cargador_frontal_disponible_real","numero_cargador_frontal_nominal"),  "", ["KPIs No esperados"]), ["KPIs No esperados"])
+
+
+        //| extend ["KPIs No esperados"] = iff(condicion_1_SinDatosPermanentes, iff(["KPIs No esperados"] == "last_record_dispatch",  "", ["KPIs No esperados"]), ["KPIs No esperados"])
+        | extend ["KPIs No esperados"] = iff(condicion_1_SinDatosPermanentes, iff(["KPIs No esperados"] == "alimentacion_chancado_plan",  "", ["KPIs No esperados"]), ["KPIs No esperados"])
+        | extend ["KPIs No esperados"] = iff(condicion_1_SinDatosPermanentes, iff(["KPIs No esperados"] == "make_up_plan",  "", ["KPIs No esperados"]), ["KPIs No esperados"])
+        //| extend ["KPIs No esperados"] = iff(condicion_1_SinDatosPermanentes, iff(["KPIs No esperados"] == "tph_transporte_plan", "", ["KPIs No esperados"]), ["KPIs No esperados"])
+        //| extend ["KPIs No esperados"] = iff(condicion_1_SinDatosPermanentes, iff(["KPIs No esperados"] == "metros_perforados_plan_dia", "", ["KPIs No esperados"]), ["KPIs No esperados"])
+        | extend ["KPIs No esperados"] = iff(condicion_2_0700_a_1000, iff(["KPIs No esperados"] == "cu_fino_filtrado_pagable_real_acc_dia", "", ["KPIs No esperados"]), ["KPIs No esperados"])
+        | extend ["KPIs No esperados"] = iff(condicion_2_0700_a_1000, iff(["KPIs No esperados"] == "mo_fino_producido_real_acc_dia", "", ["KPIs No esperados"]), ["KPIs No esperados"])
+        | extend ["KPIs No esperados"] = iff(condicion_2_0700_a_1000, iff(["KPIs No esperados"] == "mo_fino_producido_proy_dia", "", ["KPIs No esperados"]), ["KPIs No esperados"])
+        | extend ["KPIs No esperados"] = iff(condicion_2_0700_a_1000, iff(["KPIs No esperados"] == "cu_fino_producido_proy_dia", "", ["KPIs No esperados"]), ["KPIs No esperados"])
+        | extend ["KPIs No esperados"] = iff(condicion_2_0700_a_1000, iff(["KPIs No esperados"] == "cu_fino_filtrado_pagable_proy_dia", "", ["KPIs No esperados"]), ["KPIs No esperados"])
+        | extend ["KPIs No esperados"] = iff(condicion_3_1900_a_2100, iff(["KPIs No esperados"] == "ton_stockpile_proyeccion", "", ["KPIs No esperados"]), ["KPIs No esperados"])
+        | extend ["KPIs No esperados"] = iff(condicion_4_miercoles_1900_a_viernes_2100, iff(["KPIs No esperados"] == "rendimiento_perforacion_plan_dia", "", ["KPIs No esperados"]), ["KPIs No esperados"])
+        | extend ["KPIs No esperados"] = iff(condicion_5_fuera_horario_laboral, iff(["KPIs No esperados"] == "metros_perforados_real_dia", "", ["KPIs No esperados"]), ["KPIs No esperados"])
+        | extend ["KPIs No esperados"] = iff(condicion_5_fuera_horario_laboral, iff(["KPIs No esperados"] == "numero_perforadoras_operando_real_dia", "", ["KPIs No esperados"]), ["KPIs No esperados"])
+        | extend ["KPIs No esperados"] = iff(condicion_5_fuera_horario_laboral, iff(["KPIs No esperados"] == "numero_perforadoras_disponible_real_dia", "", ["KPIs No esperados"]), ["KPIs No esperados"])
+        | extend ["KPIs No esperados"] = iff(condicion_5_fuera_horario_laboral, iff(["KPIs No esperados"] == "rendimiento_perforacion_real_dia", "", ["KPIs No esperados"]), ["KPIs No esperados"])
+        | extend ["KPIs No esperados"] = iff(condicion_6_jueves_2100_a_viernes_1030, iff(["KPIs No esperados"] == "rendimiento_sag_1_plan", "", ["KPIs No esperados"]), ["KPIs No esperados"])
+        | extend ["KPIs No esperados"] = iff(condicion_6_jueves_2100_a_viernes_1030, iff(["KPIs No esperados"] == "concentrado_colectivo_plan", "", ["KPIs No esperados"]), ["KPIs No esperados"])
+        | extend ["KPIs No esperados"] = iff(condicion_6_jueves_2100_a_viernes_1030, iff(["KPIs No esperados"] == "ley_concentrado_plan", "", ["KPIs No esperados"]), ["KPIs No esperados"])
+        | extend ["KPIs No esperados"] = iff(condicion_6_jueves_2100_a_viernes_1030, iff(["KPIs No esperados"] == "ley_cu_plan", "", ["KPIs No esperados"]), ["KPIs No esperados"])
+        | extend ["KPIs No esperados"] = iff(condicion_6_jueves_2100_a_viernes_1030, iff(["KPIs No esperados"] == "ley_concentrado_mo_plan", "", ["KPIs No esperados"]), ["KPIs No esperados"])
+        | extend ["KPIs No esperados"] = iff(condicion_6_jueves_2100_a_viernes_1030, iff(["KPIs No esperados"] == "recuperacion_selectiva_mo_plan", "", ["KPIs No esperados"]), ["KPIs No esperados"])
+        | extend ["KPIs No esperados"] = iff(condicion_6_jueves_2100_a_viernes_1030, iff(["KPIs No esperados"] == "produccion_selectiva_mo_plan", "", ["KPIs No esperados"]), ["KPIs No esperados"])
+        | extend ["KPIs No esperados"] = iff(condicion_6_jueves_2100_a_viernes_1030, iff(["KPIs No esperados"] == "rendimiento_sag_2_plan", "", ["KPIs No esperados"]), ["KPIs No esperados"])
+        | extend ["KPIs No esperados"] = iff(condicion_6_jueves_2100_a_viernes_1030, iff(["KPIs No esperados"] == "rendimiento_sag_3_plan", "", ["KPIs No esperados"]), ["KPIs No esperados"])
+        | extend ["KPIs No esperados"] = iff(["KPIs No esperados"] == " ", "", ["KPIs No esperados"])
+        | where ["KPIs No esperados"] != ""
+        | extend minutos_desde_error = round(datetime_diff('second', endTime, fecha_log_UTC) / 60.0, 2)
+        | order by minutos_desde_error asc
+        | summarize ["KPIs sin datos"] = make_set(kpi_name), ["KPIs No esperados"] = make_set(["KPIs No esperados"]), ["Count No esperados"] = dcount(["KPIs No esperados"]) by bin(fecha_log_UTC, 5m)
+        | extend MinutosPasados = round(datetime_diff('second', endTime, fecha_log_UTC) / 60.0, 0)
+        | project fecha_log_UTC, MinutosPasados, ["Count No esperados"], ["KPIs No esperados"], ["KPIs sin datos"]
+        | order by fecha_log_UTC desc
+
+};
+let detalle_kpis_sin_datos = get_detalle_kpis_sin_datos(inicioFecha=endTime - totimespan(10 * 60s), finFecha=endTime);
+
+// ######################## Detalle Alertas con Errores #################################
+//let get_detalle_alarmas_con_errores = (inicioFecha: datetime, finFecha: datetime)
+//{
+//    ContainerAppConsoleLogs_CL
+//        | where TimeGenerated >= inicioFecha and TimeGenerated < finFecha
+//        | where ContainerJobName_s startswith 'mlp-prd-caj-ada-job07'
+//        | project TimeGenerated, ContainerJobName_s, Log_s
+//        | where Log_s startswith '{"fecha_log_UTC":'
+//        | extend ParsedJson = parse_json(Log_s)
+//        | evaluate bag_unpack(ParsedJson)
+//        | where log_nivel == "ERROR" and log_capa == "domain-alarm"
+//        | extend root_error_line = tostring(split(traceback, "\n")[3])
+//        | extend minutos_desde_error = round(datetime_diff('second', endTime, fecha_log_UTC) / 60.0, 2)
+//        | order by minutos_desde_error asc
+//        | project fecha_log_UTC, nombre_alarma
+//};
+//let detalle_alarmas_con_errores = get_detalle_alarmas_con_errores(inicioFecha=endTime - totimespan(10 * 60s), finFecha=endTime);
+// ######################## Alertas conocidas Front #################################
+let AlertarFront = view() {
+    AppServiceConsoleLogs
+    | where TimeGenerated >= endTime - totimespan(10 * 60s) and TimeGenerated < endTime
+    | where Level == "Error" and ResultDescription contains "/usr/src/app/app/" or (ResultDescription contains "Invalid access token")
+    | project TimeGenerated, Level, ResultDescription
+    | order by TimeGenerated desc
+};
+
+// ####################### CANTIDAD DE ERRORES EN ALARMAS ######################
+let cantidad_errores_alarmas = toscalar(
+    ContainerAppConsoleLogs_CL
+    | where TimeGenerated >= (endTime - 1d)
+    | where ContainerJobName_s startswith 'mlp-prd-caj-ada-job07'
+    | project TimeGenerated, ContainerJobName_s, Log_s
+    | where Log_s startswith '{"fecha_log_UTC":'
+    | extend ParsedJson = parse_json(Log_s)
+    | evaluate bag_unpack(ParsedJson)
+    | where log_nivel == "ERROR" and log_capa == "domain-alarm"
+    | extend dia_ocurrencia = startofday(fecha_log_UTC) 
+    | count);
+// ######################## JOIN RESULT #################################
+(statusFuentes | order by TimeGeneratedBin_Chile desc | take 1 | extend JoinKey = 1)
+  | join kind=fullouter (statusKpisAlarms | order by TimeGeneratedBin_Chile desc | take 1 | extend JoinKey = 1) on JoinKey
+  | join kind=fullouter (ultimaActualizacionFuentes | evaluate pivot(tabla, take_any(Alertar), TimeGeneratedBin_Chile) | order by TimeGeneratedBin_Chile desc | take 1 | extend JoinKey = 1) on JoinKey
+  | join kind=fullouter (detalle_kpis_sin_datos | order by fecha_log_UTC desc | take 1 | extend JoinKey = 1) on JoinKey
+//  | join kind=fullouter (detalle_alarmas_con_errores | order by fecha_log_UTC desc | take 1 | extend JoinKey = 1) on JoinKey
+  | summarize 
+      ["Alertar Meteo"] = iff(any(["job01_meteo"] startswith "a" or ["job02_meteo"] startswith "a" or ["meteodata"]), "Alertar", "No Alertar"),
+      ["Alertar PI"] = iff(any(["job01_pisystem"] startswith "a" or ["job02_pisystem"] startswith "a" or ["pisystem_interpolated"] or ["pisystem_recorded"]), "Alertar", "No Alertar"),
+      
+      ["Alertar Plans"] = iff(
+          any(["job01_plans"] startswith "a")
+          or any(["plan_diario"] == true)
+          or any(["planes_mensuales"] == true)
+          or any(["planes_semanales_AXB"] == true)
+          or any(["planes_semanales_PLANTA_CONCENTRADORA_RECUPERACION_CU"] == true)
+          or any(["planes_semanales_LEY_CONCENTRADO_CU"] == true)
+          or any(["planes_semanales_TRANSPORTADO_STMG"] == true)
+          or any(["planes_semanales_CONCENTRADO_PRODUCIDO"] == true)
+          or any(["planes_semanales_PLANTA_CONCENTRADORA_LEY_CU"] == true)
+          or any(["planes_semanales_PLANTA_CONCENTRADORA_CU_FINO_PRODUCIDO"] == true)
+          or any(["planes_semanales_PLANTA_CONCENTRADORA_MO_FINO_PRODUCIDO"] == true)
+          or any(["planes_semanales_PLANTA_CONCENTRADORA_TRATAMIENTO"] == true)
+          or any(["planes_semanales_PUERTO_CU_FINO_FILTRADO_PAGABLE"] == true)
+          or any(["planes_acc_mensuales_TRANSPORTADO_STMG"] == true)
+          //or any(["planes_acc_mensuales_AXB"] == true)
+          //or any(["planes_acc_mensuales_REMANEJO_A_CH"] == true)  //EStos producen que aparezca en rojo el panel resumen
+          //or any(["planes_acc_mensuales_REMANEJO_A_BOTADERO"] == true)  //Estos producen que aparezca en rojo el panel resumen
+          or any(["planes_acc_mensuales_CONCENTRADO_PRODUCIDO"] == true)
+          or any(["planes_acc_mensuales_PLANTA_CONCENTRADORA_LEY_CU"] == true)
+          or any(["planes_acc_mensuales_LEY_CONCENTRADO_CU"] == true)
+          or any(["planes_acc_mensuales_PUERTO_CU_FINO_FILTRADO_PAGABLE"] == true)
+          or any(["planes_acc_mensuales_PLANTA_CONCENTRADORA_TRATAMIENTO"] == true)
+          or any(["planes_acc_mensuales_EXTRACCION_MINA"] == true)
+          or any(["planes_acc_mensuales_PLANTA_CONCENTRADORA_CU_FINO_PRODUCIDO"] == true)
+          or any(["planes_acc_mensuales_PLANTA_CONCENTRADORA_MO_FINO_PRODUCIDO"] == true)
+          or any(["planes_acc_mensuales_PLANTA_CONCENTRADORA_RECUPERACION_CU"] == true)
+      , "Alertar", "No Alertar"),
+      ["Alertar Dispatch"] = iff(any(["ADF_dispatch_ingestion"] startswith "a" or ["dispatch_shiftdumps"] or ["dispatch_shiftloads"] or ["dispatch_shiftloads2"] or ["dispatch_shiftstate"] or ["dispatch_tiempos"]), "Alertar", "No Alertar"),
+      ["Alertar Drillit"] = iff(any(["ADF_drillit_ingestion"] startswith "a" or ["drillit_drill_state_history"] or ["drillit_drillings"]), "Alertar", "No Alertar"),
+      ["Alertar Blockgrade"] = iff(any(["ADF_blockgrade_ingestion"] startswith "a" or ["blockgrade_bybucket"]), "Alertar", "No Alertar"),
+      ["Alertar KPIs"] = iff(any(["job01_transporte_fluidos"] startswith "a")
+                                  or any(["job02_indicadores_generales"] startswith "a")
+                                  or any(["job03_indicadores_globales"] startswith "a")
+                                  or any(["job04_stock_chacay"] startswith "a")
+                                  or any(["job05_servicios_mina"] startswith "a")
+                                  or any(["job08_chancado"] startswith "a")
+                                  or any(["job09_carguio"] startswith "a")
+                                  or any(["job10_flotacion"] startswith "a")
+                                  or any(["job11_molienda"] startswith "a")
+                                  or any(["job12_puerto"] startswith "a")
+                                  or any(["job13_transporte"] startswith "a")
+                                  or any(["job14_desaladora"] startswith "a")
+                                  or any(["Count No esperados"]) > 0,
+                    "Alertar", "No Alertar"),
+      //["Alertar Alarmas"] = iff(any(["job06_alarms-operational-parameters"] startswith "a") or any(["job07_alarms-service"] startswith "a" or strlen(nombre_alarma) > 0), "Alertar", "No Alertar"),
+      ["Alertar Alarmas"] = iff(any(["job06_alarms-operational-parameters"] startswith "a") or any(["job07_alarms-service"] startswith "a") or cantidad_errores_alarmas > 177, "Alertar", "No Alertar"),
+      ["Alertar Front"] = iff(toscalar((AlertarFront() | count)) > 0, "Alertar", "No Alertar")
+| project
+  Meteodata  = iff(['Alertar Meteo']  == "Alertar", "ALERT", "OK"),
+  Dispatch   = iff(['Alertar Dispatch']  == "Alertar", "ALERT", "OK"),
+  PI         = iff(['Alertar PI']        == "Alertar", "ALERT", "OK"),
+  Drillit    = iff(['Alertar Drillit']   == "Alertar", "ALERT", "OK"),
+  Blockgrade = iff(['Alertar Blockgrade']== "Alertar", "ALERT", "OK"),
+  Plans      = iff(['Alertar Plans']     == "Alertar", "ALERT", "OK"),
+  KPIs       = iff(['Alertar KPIs']      == "Alertar", "ALERT", "OK"),
+  Alarmas    = iff(['Alertar Alarmas']   == "Alertar", "ALERT", "OK"),
+  Front      = iff(['Alertar Front']     == "Alertar", "ALERT", "OK")
+| extend mapa =
+  strcat(
+    "Meteodata:",   Meteodata,   ";",
+    "Dispatch:",   Dispatch,   ";",
+    "PI:",         PI,         ";",
+    "Drillit:",    Drillit,    ";",
+    "Blockgrade:", Blockgrade, ";",
+    "Plans:",      Plans,      ";",
+    "KPIs:",       KPIs,       ";",
+    "Alarmas:",    Alarmas,    ";",
+    "Front:",      Front
+  )
+
+| extend status = extract(@"Meteodata:(\w+)", 1, mapa)
+| extend color = case(
+    status == "ALERT", "#E53935",
+    status == "Warn" or status == "WARN", "#FFF4CC",
+   "#EAF4EA"
+)
+// IMPORTANTÍSIMO: quita comillas/espacios/saltos 
+| extend color = trim(' "\t\r\n', tostring(color))
+// Entrega un único valor
+| project color
+| take 1
+
+};
+
+// Execution example
+fn_prd_ada_dom_meteodata_status(ago(6h), now())
