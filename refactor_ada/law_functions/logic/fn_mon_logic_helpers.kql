@@ -1,0 +1,10 @@
+// Reusable status/color helpers
+let fn_mon_status_to_color = (status:string) {
+  case(
+    status == "ALERT", "#E53935",
+    status in ("Warn", "WARN"), "#FFF4CC",
+    "#EAF4EA"
+  )
+};
+
+let fn_mon_bool_to_status = (is_alert:bool) { iff(is_alert, "ALERT", "OK") };

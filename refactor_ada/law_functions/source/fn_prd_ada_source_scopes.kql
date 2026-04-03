@@ -1,0 +1,27 @@
+// Reusable source scopes with explicit workspaces (resource IDs)
+let fn_prd_ada_scope_container_system_logs = () {
+  union isfuzzy=true withsource=src
+    workspace("/subscriptions/c68213bf-7453-4ba4-9aaa-56b822af4c20/resourceGroups/MLP-PRD-RG-ADA/providers/Microsoft.OperationalInsights/workspaces/mlp-prd-law-ada").table("ContainerAppSystemLogs_CL"),
+    workspace("/subscriptions/c68213bf-7453-4ba4-9aaa-56b822af4c20/resourceGroups/MLP-PRD-RG-METEO/providers/Microsoft.OperationalInsights/workspaces/mlp-prd-law-meteo").table("ContainerAppSystemLogs_CL"),
+    workspace("/subscriptions/c68213bf-7453-4ba4-9aaa-56b822af4c20/resourceGroups/MLP-PRD-RG-PISYSTEM/providers/Microsoft.OperationalInsights/workspaces/mlp-prd-law-pisystem").table("ContainerAppSystemLogs_CL"),
+    workspace("/subscriptions/c68213bf-7453-4ba4-9aaa-56b822af4c20/resourceGroups/MLP-PRD-RG-PLANS/providers/Microsoft.OperationalInsights/workspaces/mlp-prd-law-plans").table("ContainerAppSystemLogs_CL")
+  | project TimeGenerated, JobName_s, Log_s, Reason_s, src
+};
+
+let fn_prd_ada_scope_pipeline_runs = () {
+  union isfuzzy=true withsource=src
+    workspace("/subscriptions/c68213bf-7453-4ba4-9aaa-56b822af4c20/resourceGroups/MLP-PRD-RG-DISPATCH/providers/Microsoft.OperationalInsights/workspaces/mlp-prd-law-dispatch").table("AzureDiagnostics"),
+    workspace("/subscriptions/c68213bf-7453-4ba4-9aaa-56b822af4c20/resourceGroups/MLP-PRD-RG-BLKGRDE/providers/Microsoft.OperationalInsights/workspaces/mlp-prd-law-blkgrde").table("AzureDiagnostics"),
+    workspace("/subscriptions/c68213bf-7453-4ba4-9aaa-56b822af4c20/resourceGroups/MLP-PRD-RG-DRILLIT/providers/Microsoft.OperationalInsights/workspaces/mlp-prd-law-drillit").table("AzureDiagnostics")
+  | where Category == "PipelineRuns"
+  | project TimeGenerated, OperationName, ResourceGroup, src
+};
+
+let fn_prd_ada_scope_custom_logs = () {
+  workspace("/subscriptions/c68213bf-7453-4ba4-9aaa-56b822af4c20/resourceGroups/MLP-PRD-RG-ADA/providers/Microsoft.OperationalInsights/workspaces/mlp-prd-law-ada").table("ContainerAppConsoleLogs_CL")
+};
+
+let fn_prd_ada_scope_front_logs = () {
+  workspace("/subscriptions/c68213bf-7453-4ba4-9aaa-56b822af4c20/resourceGroups/MLP-PRD-RG-ADA/providers/Microsoft.OperationalInsights/workspaces/mlp-prd-law-ada").table("AppServiceConsoleLogs")
+  | project TimeGenerated, Level, ResultDescription
+};
