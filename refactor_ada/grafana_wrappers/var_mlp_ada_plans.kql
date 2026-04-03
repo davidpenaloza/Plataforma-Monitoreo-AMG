@@ -1,0 +1,4 @@
+// Grafana variable wrapper for var_mlp_ada_plans
+fn_prd_ada_dom_plans_status(bin($__timeFrom, 1m), bin($__timeTo, 1m))
+| project color
+| take 1
