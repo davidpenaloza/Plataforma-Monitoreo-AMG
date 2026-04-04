@@ -74,3 +74,13 @@ No depende de ADA ni de tablas/workspaces específicos.
 
 ## Nota de límite conocido
 `global` sigue recomponiendo estados de dominios ADA. Con las restricciones actuales (sin materialización/caché compartido), ese costo no se elimina por completo.
+
+
+## Validación recomendada (evitar errores de referencias)
+Ejecutar antes de desplegar:
+
+```bash
+python refactor_ada_optimized/validate_kql_references.py
+```
+
+El script valida que cada llamada `fn_*` esté definida en `law_functions/` y que wrappers/dominios no apunten a funciones inexistentes.
