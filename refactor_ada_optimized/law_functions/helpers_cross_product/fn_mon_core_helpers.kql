@@ -1,0 +1,27 @@
+// Cross-product helpers
+let fn_mon_status_to_color = (status:string) {
+  case(status == "ALERT", "#E53935", status in ("Warn","WARN"), "#FFF4CC", "#EAF4EA")
+};
+
+let fn_mon_alert_from_job_success = (workspace_id:string, job_name:string, lookback_min:int, startTime:datetime, endTime:datetime) {
+  let ok = toscalar(
+    workspace(workspace_id).table("ContainerAppSystemLogs_CL")
+    | where TimeGenerated between (startTime - totimespan(lookback_min * 60s) .. endTime)
+    | where JobName_s == job_name
+    | where Log_s contains "has successfully completed"
+    | count
+  ) > 0;
+  iff(ok, "OK", "ALERT")
+};
+
+let fn_mon_alert_from_pipeline_success = (workspace_id:string, resource_group:string, lookback_min:int, startTime:datetime, endTime:datetime) {
+  let ok = toscalar(
+    workspace(workspace_id).table("AzureDiagnostics")
+    | where TimeGenerated between (startTime - totimespan(lookback_min * 60s) .. endTime)
+    | where Category == "PipelineRuns"
+    | where ResourceGroup == resource_group
+    | where OperationName has "Succeeded"
+    | count
+  ) > 0;
+  iff(ok, "OK", "ALERT")
+};
