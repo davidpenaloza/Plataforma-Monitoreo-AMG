@@ -20,6 +20,11 @@ No depende de ADA ni de tablas/workspaces específicos.
   - `fn_mon_alert_from_job_success`
   - `fn_mon_alert_from_pipeline_success`
   - `fn_mon_global_from_color_set`
+  - `fn_prd_ada_alert_from_job_success` (alias)
+  - `fn_prd_ada_alert_from_pipeline_success` (alias)
+
+> Nota de compatibilidad: también existen alias `fn_prd_ada_alert_from_job_success` y
+> `fn_prd_ada_alert_from_pipeline_success` para evitar quiebres con snippets antiguos.
 
 ### 2) ADA-only helpers
 - `helpers_ada/fn_prd_ada_lag_helpers.kql`
