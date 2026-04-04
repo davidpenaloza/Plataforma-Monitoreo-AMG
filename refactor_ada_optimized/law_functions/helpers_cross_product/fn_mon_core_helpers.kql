@@ -36,13 +36,3 @@ let fn_mon_global_from_color_set = (colors:dynamic, alert_color:string = "#E5393
   );
   iff(has_alert == 1, alert_color, ok_color)
 };
-
-
-// Backward-compatible aliases for previously used helper names
-let fn_prd_ada_alert_from_job_success = (workspace_id:string, job_name:string, lookback_min:int, startTime:datetime, endTime:datetime) {
-  fn_mon_alert_from_job_success(workspace_id, job_name, lookback_min, startTime, endTime)
-};
-
-let fn_prd_ada_alert_from_pipeline_success = (workspace_id:string, resource_group:string, lookback_min:int, startTime:datetime, endTime:datetime) {
-  fn_mon_alert_from_pipeline_success(workspace_id, resource_group, lookback_min, startTime, endTime)
-};
