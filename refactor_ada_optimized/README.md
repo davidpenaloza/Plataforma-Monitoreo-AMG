@@ -15,11 +15,10 @@ No depende de ADA ni de tablas/workspaces específicos.
 
 ## Funciones necesarias (LAW)
 ### 1) Cross-product helpers
-- `helpers_cross_product/fn_mon_core_helpers.kql`
-  - `fn_mon_status_to_color`
-  - `fn_mon_alert_from_job_success`
-  - `fn_mon_alert_from_pipeline_success`
-  - `fn_mon_global_from_color_set`
+- `helpers_cross_product/fn_mon_status_to_color.kql` -> `fn_mon_status_to_color`
+- `helpers_cross_product/fn_mon_alert_from_job_success.kql` -> `fn_mon_alert_from_job_success`
+- `helpers_cross_product/fn_mon_alert_from_pipeline_success.kql` -> `fn_mon_alert_from_pipeline_success`
+- `helpers_cross_product/fn_mon_global_from_color_set.kql` -> `fn_mon_global_from_color_set`
 
 ### 2) ADA-only helpers
 - `helpers_ada/fn_prd_ada_lag_helpers.kql`
@@ -59,7 +58,7 @@ No depende de ADA ni de tablas/workspaces específicos.
 - `var_mlp_ada_front.kql`
 
 ## Orden de implementación recomendado
-1. Crear `fn_mon_core_helpers.kql` en LAW.
+1. Crear los 4 archivos de `law_functions/helpers_cross_product/` en LAW.
 2. Crear `fn_prd_ada_lag_helpers.kql` en LAW.
 3. Crear las 10 funciones de `law_functions/domains/`.
 4. Reemplazar en Grafana cada variable por su wrapper homónimo en `grafana_wrappers/`.
