@@ -1,0 +1,43 @@
+// Cross-product helpers
+let fn_mon_status_to_color = (status:string) {
+  let normalized = toupper(trim(@' ', tostring(coalesce(status, ""))));
+  case(
+    normalized == "ALERT", "#E53935",
+    normalized in ("WARN", "WARNING"), "#FFF4CC",
+    "#EAF4EA"
+  )
+};
+
+let fn_mon_alert_from_job_success = (workspace_id:string, job_name:string, lookback_min:int, startTime:datetime, endTime:datetime) {
+  let ok = toscalar(
+    workspace(workspace_id).table("ContainerAppSystemLogs_CL")
+    | where TimeGenerated between (startTime - totimespan(lookback_min * 60s) .. endTime)
+    | where JobName_s == job_name
+    | where Log_s contains "has successfully completed"
+    | count
+  ) > 0;
+  iff(ok, "OK", "ALERT")
+};
+
+let fn_mon_alert_from_pipeline_success = (workspace_id:string, resource_group:string, lookback_min:int, startTime:datetime, endTime:datetime) {
+  let ok = toscalar(
+    workspace(workspace_id).table("AzureDiagnostics")
+    | where TimeGenerated between (startTime - totimespan(lookback_min * 60s) .. endTime)
+    | where Category == "PipelineRuns"
+    | where ResourceGroup == resource_group
+    | where OperationName has "Succeeded"
+    | count
+  ) > 0;
+  iff(ok, "OK", "ALERT")
+};
+
+// Generic global consolidation helper from an already-resolved color set.
+// This helper is intentionally lightweight and does not query any datasource.
+let fn_mon_global_from_color_set = (colors:dynamic, alert_color:string = "#E53935", ok_color:string = "#EAF4EA") {
+  let has_alert = toscalar(
+    print colors = colors
+    | mv-expand c = colors to typeof(string)
+    | summarize has_alert = max(iff(c == alert_color, 1, 0))
+  );
+  iff(coalesce(has_alert, 0) == 1, alert_color, ok_color)
+};
