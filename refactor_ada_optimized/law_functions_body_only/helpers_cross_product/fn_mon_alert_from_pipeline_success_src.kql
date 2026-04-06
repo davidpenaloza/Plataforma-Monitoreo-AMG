@@ -1,0 +1,9 @@
+  let ok = toscalar(
+    src
+    | where TimeGenerated between (startTime - totimespan(lookback_min * 60s) .. endTime)
+    | where Category == "PipelineRuns"
+    | where ResourceGroup == resource_group
+    | where OperationName has "Succeeded"
+    | count
+  ) > 0;
+  iff(ok, "OK", "ALERT")

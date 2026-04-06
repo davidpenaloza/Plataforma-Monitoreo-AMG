@@ -1,0 +1,14 @@
+  let job06_ok = fn_mon_alert_from_job_success_src(workspace("/subscriptions/c68213bf-7453-4ba4-9aaa-56b822af4c20/resourceGroups/MLP-PRD-RG-ADA/providers/Microsoft.OperationalInsights/workspaces/mlp-prd-law-ada").table("ContainerAppSystemLogs_CL"), "mlp-prd-caj-ada-job06", 35, startTime, endTime) == "OK";
+  let job07_ok = fn_mon_alert_from_job_success_src(workspace("/subscriptions/c68213bf-7453-4ba4-9aaa-56b822af4c20/resourceGroups/MLP-PRD-RG-ADA/providers/Microsoft.OperationalInsights/workspaces/mlp-prd-law-ada").table("ContainerAppSystemLogs_CL"), "mlp-prd-caj-ada-job07", 10, startTime, endTime) == "OK";
+  let errores = toscalar(
+    workspace("/subscriptions/c68213bf-7453-4ba4-9aaa-56b822af4c20/resourceGroups/MLP-PRD-RG-ADA/providers/Microsoft.OperationalInsights/workspaces/mlp-prd-law-ada").table("ContainerAppConsoleLogs_CL")
+    | where TimeGenerated >= endTime - 1d and TimeGenerated < endTime
+    | where ContainerJobName_s startswith 'mlp-prd-caj-ada-job07'
+    | where Log_s startswith '{"fecha_log_UTC":'
+    | extend ParsedJson = parse_json(Log_s)
+    | evaluate bag_unpack(ParsedJson)
+    | where log_nivel == "ERROR" and log_capa == "domain-alarm"
+    | count
+  );
+  let status = iff(not(job06_ok) or not(job07_ok) or errores > 177, "ALERT", "OK");
+  print color = fn_mon_status_to_color(status)

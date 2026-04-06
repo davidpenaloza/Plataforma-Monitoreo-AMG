@@ -1,0 +1,4 @@
+  let job = fn_mon_alert_from_job_success_src(workspace("/subscriptions/c68213bf-7453-4ba4-9aaa-56b822af4c20/resourceGroups/MLP-PRD-RG-PISYSTEM/providers/Microsoft.OperationalInsights/workspaces/mlp-prd-law-pisystem").table("ContainerAppSystemLogs_CL"), "mlp-prd-caj-pisystem-job01", 25, startTime, endTime);
+  let lag = fn_prd_ada_alert_from_tables_lag(dynamic(["pisystem_interpolated"]), startTime, endTime);
+  let status = iff(job == "ALERT" or lag == "ALERT", "ALERT", "OK");
+  print color = fn_mon_status_to_color(status)

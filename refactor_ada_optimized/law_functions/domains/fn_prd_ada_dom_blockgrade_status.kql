@@ -1,0 +1,6 @@
+let fn_prd_ada_dom_blockgrade_status = (startTime:datetime, endTime:datetime) {
+  let ing = fn_mon_alert_from_pipeline_success_src(workspace("/subscriptions/c68213bf-7453-4ba4-9aaa-56b822af4c20/resourceGroups/MLP-PRD-RG-BLKGRDE/providers/Microsoft.OperationalInsights/workspaces/mlp-prd-law-blkgrde").table("AzureDiagnostics"), "MLP-PRD-RG-BLKGRDE", 60, startTime, endTime);
+  let lag = fn_prd_ada_alert_from_tables_lag(dynamic(["blockgrade_bybucket"]), startTime, endTime);
+  let status = iff(ing == "ALERT" or lag == "ALERT", "ALERT", "OK");
+  print color = fn_mon_status_to_color(status)
+};

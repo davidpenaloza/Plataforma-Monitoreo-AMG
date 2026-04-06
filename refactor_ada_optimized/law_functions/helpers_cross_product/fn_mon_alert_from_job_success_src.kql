@@ -1,0 +1,16 @@
+let fn_mon_alert_from_job_success_src = (
+    src:(TimeGenerated:datetime, JobName_s:string, Log_s:string),
+    job_name:string,
+    lookback_min:int,
+    startTime:datetime,
+    endTime:datetime
+) {
+  let ok = toscalar(
+    src
+    | where TimeGenerated between (startTime - totimespan(lookback_min * 60s) .. endTime)
+    | where JobName_s == job_name
+    | where Log_s contains "has successfully completed"
+    | count
+  ) > 0;
+  iff(ok, "OK", "ALERT")
+};
