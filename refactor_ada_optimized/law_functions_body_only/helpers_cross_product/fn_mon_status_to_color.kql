@@ -1,0 +1,6 @@
+  let normalized = toupper(trim(@' ', tostring(coalesce(status, ""))));
+  case(
+    normalized == "ALERT", "#E53935",
+    normalized in ("WARN", "WARNING"), "#FFF4CC",
+    "#EAF4EA"
+  )

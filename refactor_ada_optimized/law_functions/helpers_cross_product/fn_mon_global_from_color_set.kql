@@ -1,0 +1,8 @@
+let fn_mon_global_from_color_set = (colors:dynamic, alert_color:string = "#E53935", ok_color:string = "#EAF4EA") {
+  let has_alert = toscalar(
+    print colors = colors
+    | mv-expand c = colors to typeof(string)
+    | summarize has_alert = max(iff(c == alert_color, 1, 0))
+  );
+  iff(coalesce(has_alert, 0) == 1, alert_color, ok_color)
+};

@@ -1,0 +1,17 @@
+let fn_mon_alert_from_pipeline_success_src_v2 = (
+    src:(TimeGenerated:datetime, Category:string, ResourceGroup:string, OperationName:string),
+    resource_group:string,
+    lookback_min:int,
+    startTime:datetime,
+    endTime:datetime
+) {
+  let ok = toscalar(
+    src
+    | where TimeGenerated between (startTime - totimespan(lookback_min * 60s) .. endTime)
+    | where Category == "PipelineRuns"
+    | where ResourceGroup == resource_group
+    | where OperationName has "Succeeded"
+    | count
+  ) > 0;
+  iff(ok, "OK", "ALERT")
+};
