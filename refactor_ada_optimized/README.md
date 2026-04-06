@@ -94,12 +94,89 @@ Este paquete quedó en formato final **1 archivo `.kql` = 1 función** (LAW) y *
 - `startTime:datetime`
 - `endTime:datetime`
 
+**Importante (parámetro tabular `src`)**  
+`src` es **un solo parámetro tabular**, no 3 parámetros separados.  
+En LAW UI debes agregarlo exactamente así en Function parameters:
+`src:(TimeGenerated:datetime, JobName_s:string, Log_s:string)`
+
+**Ejemplo correcto en la grilla de parámetros (5 filas):**
+1. `src:(TimeGenerated:datetime, JobName_s:string, Log_s:string)`  *(tipo tabular)*
+2. `job_name:string`
+3. `lookback_min:int`
+4. `startTime:datetime`
+5. `endTime:datetime`
+
+**Error común (NO hacerlo):** agregar `TimeGenerated`, `JobName_s` y `Log_s` como parámetros separados.
+
+**Si la UI no te deja definir `src` tabular en la grilla:**  
+Créala desde el editor de consultas (Logs) con comando KQL:
+
+```kql
+.create-or-alter function with (folder = "Soporte DAA")
+fn_mon_alert_from_job_success_src_v2(
+    src:(TimeGenerated:datetime, JobName_s:string, Log_s:string),
+    job_name:string,
+    lookback_min:int,
+    startTime:datetime,
+    endTime:datetime
+)
+{
+  let ok = toscalar(
+    src
+    | where TimeGenerated between (startTime - totimespan(lookback_min * 60s) .. endTime)
+    | where JobName_s == job_name
+    | where Log_s contains "has successfully completed"
+    | count
+  ) > 0;
+  iff(ok, "OK", "ALERT")
+}
+```
+
 #### 3) `fn_mon_alert_from_pipeline_success_src_v2`
 - `src:(TimeGenerated:datetime, Category:string, ResourceGroup:string, OperationName:string)`
 - `resource_group:string`
 - `lookback_min:int`
 - `startTime:datetime`
 - `endTime:datetime`
+
+**Importante (parámetro tabular `src`)**  
+`src` es **un solo parámetro tabular**, no 4 parámetros separados.  
+En LAW UI debes agregarlo exactamente así en Function parameters:
+`src:(TimeGenerated:datetime, Category:string, ResourceGroup:string, OperationName:string)`
+
+**Ejemplo correcto en la grilla de parámetros (5 filas):**
+1. `src:(TimeGenerated:datetime, Category:string, ResourceGroup:string, OperationName:string)`  *(tipo tabular)*
+2. `resource_group:string`
+3. `lookback_min:int`
+4. `startTime:datetime`
+5. `endTime:datetime`
+
+**Error común (NO hacerlo):** agregar `TimeGenerated`, `Category`, `ResourceGroup` y `OperationName` como parámetros separados.
+
+**Si la UI no te deja definir `src` tabular en la grilla:**  
+Créala desde el editor de consultas (Logs) con comando KQL:
+
+```kql
+.create-or-alter function with (folder = "Soporte DAA")
+fn_mon_alert_from_pipeline_success_src_v2(
+    src:(TimeGenerated:datetime, Category:string, ResourceGroup:string, OperationName:string),
+    resource_group:string,
+    lookback_min:int,
+    startTime:datetime,
+    endTime:datetime
+)
+{
+  let ok = toscalar(
+    src
+    | where TimeGenerated between (startTime - totimespan(lookback_min * 60s) .. endTime)
+    | where Category == "PipelineRuns"
+    | where ResourceGroup == resource_group
+    | where OperationName has "Succeeded"
+    | count
+  ) > 0;
+  iff(ok, "OK", "ALERT")
+}
+```
 
 #### 4) `fn_mon_global_from_color_set`
 - `colors:dynamic`
