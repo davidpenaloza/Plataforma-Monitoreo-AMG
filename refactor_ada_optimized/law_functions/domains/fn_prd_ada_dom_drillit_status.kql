@@ -1,0 +1,6 @@
+let fn_prd_ada_dom_drillit_status = (startTime:datetime, endTime:datetime) {
+  let ing = fn_mon_alert_from_pipeline_success("/subscriptions/c68213bf-7453-4ba4-9aaa-56b822af4c20/resourceGroups/MLP-PRD-RG-DRILLIT/providers/Microsoft.OperationalInsights/workspaces/mlp-prd-law-drillit", "MLP-PRD-RG-DRILLIT", 35, startTime, endTime);
+  let lag = fn_prd_ada_alert_from_tables_lag(dynamic(["drillit_drillings","drillit_drill_state_history"]), startTime, endTime);
+  let status = iff(ing == "ALERT" or lag == "ALERT", "ALERT", "OK");
+  print color = fn_mon_status_to_color(status)
+};
