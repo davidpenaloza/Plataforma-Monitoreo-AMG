@@ -75,6 +75,90 @@ Este paquete quedó en formato final **1 archivo `.kql` = 1 función** (LAW) y *
 - `fn_prd_ada_dom_kpi_detalle_html(startTime:datetime, endTime:datetime)`
 - `fn_prd_ada_dom_global_status(startTime:datetime, endTime:datetime)`
 
+## Cómo completar "Function parameters" en LAW UI (una por una)
+
+> En LAW UI, al crear la función:
+> 1) En **Function name** usa el nombre exacto.
+> 2) En **Function parameters** agrega los parámetros exactamente como se listan abajo (mismo nombre y tipo).
+> 3) En **Body** pega el contenido desde `law_functions_body_only/...`.
+
+### Cross-product helpers
+
+#### 1) `fn_mon_status_to_color`
+- `status:string`
+
+#### 2) `fn_mon_alert_from_job_success_src_v2`
+- `src:(TimeGenerated:datetime, JobName_s:string, Log_s:string)`
+- `job_name:string`
+- `lookback_min:int`
+- `startTime:datetime`
+- `endTime:datetime`
+
+#### 3) `fn_mon_alert_from_pipeline_success_src_v2`
+- `src:(TimeGenerated:datetime, Category:string, ResourceGroup:string, OperationName:string)`
+- `resource_group:string`
+- `lookback_min:int`
+- `startTime:datetime`
+- `endTime:datetime`
+
+#### 4) `fn_mon_global_from_color_set`
+- `colors:dynamic`
+- `alert_color:string = "#E53935"` *(opcional, con default)*
+- `ok_color:string = "#EAF4EA"` *(opcional, con default)*
+
+### ADA-only helper
+
+#### 5) `fn_prd_ada_alert_from_tables_lag`
+- `tables:dynamic`
+- `startTime:datetime`
+- `endTime:datetime`
+
+### Domain functions
+
+#### 6) `fn_prd_ada_dom_dispatch_status`
+- `startTime:datetime`
+- `endTime:datetime`
+
+#### 7) `fn_prd_ada_dom_drillit_status`
+- `startTime:datetime`
+- `endTime:datetime`
+
+#### 8) `fn_prd_ada_dom_blockgrade_status`
+- `startTime:datetime`
+- `endTime:datetime`
+
+#### 9) `fn_prd_ada_dom_pi_status`
+- `startTime:datetime`
+- `endTime:datetime`
+
+#### 10) `fn_prd_ada_dom_plans_status`
+- `startTime:datetime`
+- `endTime:datetime`
+
+#### 11) `fn_prd_ada_dom_meteodata_status`
+- `startTime:datetime`
+- `endTime:datetime`
+
+#### 12) `fn_prd_ada_dom_alarm_status`
+- `startTime:datetime`
+- `endTime:datetime`
+
+#### 13) `fn_prd_ada_dom_front_status`
+- `startTime:datetime`
+- `endTime:datetime`
+
+#### 14) `fn_prd_ada_dom_kpi_status`
+- `startTime:datetime`
+- `endTime:datetime`
+
+#### 15) `fn_prd_ada_dom_kpi_detalle_html`
+- `startTime:datetime`
+- `endTime:datetime`
+
+#### 16) `fn_prd_ada_dom_global_status`
+- `startTime:datetime`
+- `endTime:datetime`
+
 ## Orden de implementación
 1. Crear en LAW los 4 `helpers_cross_product`.
 2. Crear en LAW el helper ADA-only.
