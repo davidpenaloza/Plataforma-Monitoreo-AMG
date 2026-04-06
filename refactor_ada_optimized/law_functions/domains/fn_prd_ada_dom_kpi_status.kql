@@ -1,0 +1,21 @@
+let fn_prd_ada_dom_kpi_status = (startTime:datetime, endTime:datetime) {
+  let jobs_missing = toscalar(
+    workspace("/subscriptions/c68213bf-7453-4ba4-9aaa-56b822af4c20/resourceGroups/MLP-PRD-RG-ADA/providers/Microsoft.OperationalInsights/workspaces/mlp-prd-law-ada").table("ContainerAppSystemLogs_CL")
+    | where TimeGenerated between (endTime - 15m .. endTime)
+    | where JobName_s in ("mlp-prd-caj-ada-job01","mlp-prd-caj-ada-job02","mlp-prd-caj-ada-job03","mlp-prd-caj-ada-job04","mlp-prd-caj-ada-job05","mlp-prd-caj-ada-job08","mlp-prd-caj-ada-job09","mlp-prd-caj-ada-job10","mlp-prd-caj-ada-job11","mlp-prd-caj-ada-job12","mlp-prd-caj-ada-job13","mlp-prd-caj-ada-job14")
+    | where Log_s contains "has successfully completed"
+    | count
+  ) == 0;
+  let kpi_errors = toscalar(
+    workspace("/subscriptions/c68213bf-7453-4ba4-9aaa-56b822af4c20/resourceGroups/MLP-PRD-RG-ADA/providers/Microsoft.OperationalInsights/workspaces/mlp-prd-law-ada").table("ContainerAppConsoleLogs_CL")
+    | where TimeGenerated between (endTime - 180m .. endTime)
+    | where ContainerJobName_s startswith 'mlp-prd-caj-ada-job' and not(ContainerJobName_s startswith 'mlp-prd-caj-ada-job07')
+    | where Log_s startswith '{"fecha_log_UTC":'
+    | extend ParsedJson = parse_json(Log_s)
+    | evaluate bag_unpack(ParsedJson)
+    | where log_nivel == "ERROR"
+    | count
+  ) > 0;
+  let status = iff(jobs_missing or kpi_errors, "ALERT", "OK");
+  print color = fn_mon_status_to_color(status)
+};
