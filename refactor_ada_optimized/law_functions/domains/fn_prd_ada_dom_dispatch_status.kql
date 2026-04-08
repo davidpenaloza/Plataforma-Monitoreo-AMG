@@ -4,13 +4,6 @@ let fn_prd_ada_dom_dispatch_status = (startTime:datetime, endTime:datetime) {
     "StdShiftState","ShiftInfo","SHIFTShiftLoad","StdGrade",
     "dispatch_shiftdumps","dispatch_shiftloads","dispatch_shiftloads2","dispatch_shiftstate","dispatch_tiempos"
   ]);
-  let ing_ok = toscalar(
-    fn_src_pipeline_runs_all(startTime - 35m, endTime)
-    | where ResourceGroup == "MLP-PRD-RG-DISPATCH" // filtro temprano por dominio
-    | where Category == "PipelineRuns"
-    | where OperationName has "Succeeded"
-    | count
-  ) > 0;
   let lag_classic = fn_prd_ada_alert_from_tables_lag(dispatch_tables, startTime, endTime);
   let lag_nrt = fn_prd_ada_alert_from_dispatch_nrt_logs(dispatch_tables, startTime, endTime);
   let consec_fail_job17 = toscalar(
@@ -33,6 +26,6 @@ let fn_prd_ada_dom_dispatch_status = (startTime:datetime, endTime:datetime) {
     | where rn == 1
     | project alerta = is_fail == 1 and next_fail == 1
   );
-  let status = iff(not(ing_ok) or lag_classic == "ALERT" or lag_nrt == "ALERT" or consec_fail_job17, "ALERT", "OK");
+  let status = iff(lag_classic == "ALERT" or lag_nrt == "ALERT" or consec_fail_job17, "ALERT", "OK");
   print color = fn_mon_status_to_color(status)
 };
