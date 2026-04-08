@@ -19,12 +19,12 @@
       | where JobName_s == "mlp-prd-caj-ada-job17"
       | where Log_s contains "has successfully completed"
       | extend TimeGeneratedBin_Chile = bin(TimeGenerated - 7m, 10m)
-      | summarize real = count() by TimeGeneratedBin_Chile
+      | summarize valorReal = count() by TimeGeneratedBin_Chile
     ) on TimeGeneratedBin_Chile
     | project-away TimeGeneratedBin_Chile1
     | extend esperado = 1
-    | extend real = coalesce(real, 0)
-    | extend status = iff(real == 0 and esperado == 1, "a", "n")
+    | extend valorReal = coalesce(valorReal, 0)
+    | extend status = iff(valorReal == 0 and esperado == 1, "a", "n")
     | order by TimeGeneratedBin_Chile desc
     | serialize
     | extend is_fail = iff(status == "a", 1, 0)
