@@ -14,25 +14,24 @@ let fn_prd_ada_dom_dispatch_status = (startTime:datetime, endTime:datetime) {
   let lag_classic = fn_prd_ada_alert_from_tables_lag(dispatch_tables, startTime, endTime);
   let lag_nrt = fn_prd_ada_alert_from_dispatch_nrt_logs(dispatch_tables, startTime, endTime);
   let consec_fail_job17 = toscalar(
-    let bins_esperados =
-      range TimeGeneratedBin_Chile from bin(endTime - 30m, 10m) to bin(endTime, 10m) step 10m
-      | extend esperado = 1;
-    let bins_reales =
+    range TimeGeneratedBin_Chile from bin(endTime - 30m, 10m) to bin(endTime, 10m) step 10m
+    | join kind=leftouter (
       fn_src_systemlogs_all(endTime - 45m, endTime)
       | where JobName_s == "mlp-prd-caj-ada-job17"
       | where Log_s contains "has successfully completed"
       | extend TimeGeneratedBin_Chile = bin(TimeGenerated - 7m, 10m)
-      | summarize real = count() by TimeGeneratedBin_Chile;
-    bins_esperados
-    | join kind=leftouter bins_reales on TimeGeneratedBin_Chile
+      | summarize real = count() by TimeGeneratedBin_Chile
+    ) on TimeGeneratedBin_Chile
+    | project-away TimeGeneratedBin_Chile1
+    | extend esperado = 1
     | extend real = coalesce(real, 0)
-    | extend status = iff(real == 0 and esperado > 0, "a", "n")
+    | extend status = iff(real == 0 and esperado == 1, "a", "n")
     | order by TimeGeneratedBin_Chile desc
     | serialize
     | extend is_fail = iff(status == "a", 1, 0)
-    | extend prev_fail = prev(is_fail, 1)
-    | where row_number() == 1
-    | project alerta = is_fail == 1 and prev_fail == 1
+    | extend next_fail = next(is_fail, 1), rn = row_number()
+    | where rn == 1
+    | project alerta = is_fail == 1 and next_fail == 1
   );
   let status = iff(not(ing_ok) or lag_classic == "ALERT" or lag_nrt == "ALERT" or consec_fail_job17, "ALERT", "OK");
   print color = fn_mon_status_to_color(status)
