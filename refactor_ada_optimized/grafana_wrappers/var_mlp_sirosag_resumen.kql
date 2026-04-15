@@ -1,0 +1,1 @@
+fn_prd_ssag_dom_resumen_status(bin($__timeFrom, 1m), bin($__timeTo, 1m))
