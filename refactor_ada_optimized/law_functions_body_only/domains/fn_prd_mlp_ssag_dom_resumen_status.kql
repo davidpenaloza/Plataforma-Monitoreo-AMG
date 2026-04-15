@@ -1,0 +1,98 @@
+let fn_prd_mlp_ssag_dom_resumen_status = (startTime:datetime, endTime:datetime) {
+    let metric_status = union
+        (fn_prd_ssag_eval_ejecucion('mlp-prd-caj-ssag-job01',     endTime, 60,  5,  'lte') | extend Metric='Fallas_job_01'),
+        (fn_prd_ssag_eval_ejecucion('mlp-prd-caj-ssag-job02',     endTime, 60,  5,  'lte') | extend Metric='Fallas_job_02'),
+        (fn_prd_ssag_eval_ejecucion('mlp-prd-caj-ssag-job03',     endTime, 60,  5,  'lte') | extend Metric='Fallas_job_03'),
+        (fn_prd_ssag_eval_ejecucion('mlp-prd-caj-ssag-job04',     endTime, 240,  1,  'lt')  | extend Metric='Fallas_job_04'),
+        (fn_prd_ssag_eval_ejecucion('mlp-prd-caj-ssag-job05',     endTime, 240,  1,  'lt')  | extend Metric='Fallas_job_05'),
+        (fn_prd_ssag_eval_ejecucion('mlp-prd-caj-ssag-job06',     endTime, 240,  1,  'lt')  | extend Metric='Fallas_job_06'),
+        (fn_prd_ssag_eval_ejecucion('mlp-prd-caj-ssag-job07',     endTime, 240,  1,  'lt')  | extend Metric='Fallas_job_07'),
+        (fn_prd_ssag_eval_ejecucion('mlp-prd-caj-ssag-job08',     endTime, 240,  1,  'lt')  | extend Metric='Fallas_job_08'),
+        (fn_prd_ssag_eval_ejecucion('mlp-prd-caj-ssag-job09',     endTime, 240,  1,  'lt')  | extend Metric='Fallas_job_09'),
+        (fn_prd_ssag_eval_ejecucion('mlp-prd-caj-ssag-job10',     endTime, 240,  1,  'lt')  | extend Metric='Fallas_job_10'),
+        (fn_prd_ssag_eval_ejecucion('mlp-prd-caj-ssag-job11',     endTime, 240,  1,  'lt')  | extend Metric='Fallas_job_11'),
+        (fn_prd_ssag_eval_ejecucion('mlp-prd-caj-ssag-job12',     endTime, 60,  5,  'lte') | extend Metric='Fallas_job_12'),
+        (fn_prd_ssag_eval_ejecucion('mlp-prd-caj-ssag-job13',     endTime, 60,  5,  'lte') | extend Metric='Fallas_job_13'),
+        (fn_prd_ssag_eval_ejecucion('mlp-prd-caj-plans-job01',    endTime, 180,  5,  'lte') | extend Metric='Fallas_planes'),
+        (fn_prd_ssag_eval_ejecucion('mlp-prd-caj-pdmsagi-job01',  endTime, 1440, 0,  'eq')  | extend Metric='Fallas_pdm'),
+        (fn_prd_ssag_eval_ejecucion('mlp-prd-caj-pisystem-job01', endTime, 10, 30, 'lte') | extend Metric='Fallas_PISYSTEM'),
+        (fn_prd_ssag_eval_desfase('mlp-prd-caj-ssag-job01',       endTime, 60, 5)    | extend Metric='Desfase_Job_01'),
+        (fn_prd_ssag_eval_desfase('mlp-prd-caj-ssag-job02',       endTime, 60, 5)    | extend Metric='Desfase_Job_02'),
+        (fn_prd_ssag_eval_desfase('mlp-prd-caj-ssag-job03',       endTime, 60, 5)    | extend Metric='Desfase_Job_03'),
+        (fn_prd_ssag_eval_desfase('mlp-prd-caj-ssag-job04',       endTime, 300, 245)  | extend Metric='Desfase_Job_04'),
+        (fn_prd_ssag_eval_desfase('mlp-prd-caj-ssag-job05',       endTime, 300, 245)  | extend Metric='Desfase_Job_05'),
+        (fn_prd_ssag_eval_desfase('mlp-prd-caj-ssag-job06',       endTime, 300, 245)  | extend Metric='Desfase_Job_06'),
+        (fn_prd_ssag_eval_desfase('mlp-prd-caj-ssag-job07',       endTime, 300, 245)  | extend Metric='Desfase_Job_07'),
+        (fn_prd_ssag_eval_desfase('mlp-prd-caj-ssag-job08',       endTime, 300, 245)  | extend Metric='Desfase_Job_08'),
+        (fn_prd_ssag_eval_desfase('mlp-prd-caj-ssag-job09',       endTime, 300, 245)  | extend Metric='Desfase_Job_09'),
+        (fn_prd_ssag_eval_desfase('mlp-prd-caj-ssag-job10',       endTime, 300, 245)  | extend Metric='Desfase_Job_10'),
+        (fn_prd_ssag_eval_desfase('mlp-prd-caj-ssag-job11',       endTime, 300, 245)  | extend Metric='Desfase_Job_11'),
+        (fn_prd_ssag_eval_desfase('mlp-prd-caj-ssag-job12',       endTime, 60, 5)    | extend Metric='Desfase_Job_12'),
+        (fn_prd_ssag_eval_desfase('mlp-prd-caj-ssag-job13',       endTime, 60, 5)    | extend Metric='Desfase_Job_13'),
+        (fn_prd_ssag_eval_desfase('mlp-prd-caj-plans-job01',      endTime, 1080, 1080)| extend Metric='Desfase_planes'),
+        (fn_prd_ssag_eval_desfase('mlp-prd-caj-pdmsagi-job01',    endTime, 1440, 1440)| extend Metric='Desfase_pdm'),
+        (fn_prd_ssag_eval_desactualizacion('mlp-prd-caj-ssag-job04', endTime, 60, "{'last_timestamp_pdm_sag'",    28, 10, 2400) | extend Metric='Desactualizacion_pdm'),
+        (fn_prd_ssag_eval_desactualizacion('mlp-prd-caj-ssag-job02', endTime, 60, "{'last_timestamp_notpii_UTC'", 31, 19, 30)   | extend Metric='Desactualizacion_pi'),
+        (fn_prd_ssag_eval_desactualizacion('mlp-prd-caj-ssag-job04', endTime, 60, '[INFO] Last Timestamp F80',    27, 19, 2400) | extend Metric='F80'),
+        (fn_prd_ssag_eval_desactualizacion('mlp-prd-caj-ssag-job04', endTime, 60, '[INFO] Last Timestamp AXB',    27, 19, 2400) | extend Metric='AXB')
+    | summarize Status = take_any(Status) by Metric
+    | evaluate pivot(Metric, take_any(Status));
+
+    metric_status
+    | project
+        Ingesta_PI = iff(
+            column_ifexists('Fallas_PISYSTEM', 'OK') == 'NOOK' or
+            column_ifexists('Desactualizacion_pi', 'OK') == 'NOOK',
+            'Alertar', 'No Alertar'),
+        Ingesta_PDM_Sag = iff(
+            column_ifexists('Desfase_pdm', 'OK') == 'NOOK' or
+            column_ifexists('Fallas_pdm', 'OK') == 'NOOK' or
+            column_ifexists('Desactualizacion_pdm', 'OK') == 'NOOK',
+            'Alertar', 'No Alertar'),
+        Ingesta_Planes = iff(
+            column_ifexists('Desfase_planes', 'OK') == 'NOOK' or
+            column_ifexists('Fallas_planes', 'OK') == 'NOOK' or
+            column_ifexists('F80', 'OK') == 'NOOK' or
+            column_ifexists('AXB', 'OK') == 'NOOK',
+            'Alertar', 'No Alertar'),
+        Salud_ITOT = iff(
+            column_ifexists('Desfase_Job_01', 'OK') == 'NOOK' or
+            column_ifexists('Fallas_job_01', 'OK') == 'NOOK',
+            'Alertar', 'No Alertar'),
+        Procesamiento_PI = iff(
+            column_ifexists('Desfase_Job_02', 'OK') == 'NOOK' or
+            column_ifexists('Fallas_job_02', 'OK') == 'NOOK',
+            'Alertar', 'No Alertar'),
+        Procesamiento_Restricciones = iff(
+            column_ifexists('Desfase_Job_03', 'OK') == 'NOOK' or
+            column_ifexists('Fallas_job_03', 'OK') == 'NOOK',
+            'Alertar', 'No Alertar'),
+        Celdas = iff(
+            column_ifexists('Desfase_Job_04', 'OK') == 'NOOK' or
+            column_ifexists('Fallas_job_04', 'OK') == 'NOOK' or
+            column_ifexists('Desfase_Job_06', 'OK') == 'NOOK' or
+            column_ifexists('Fallas_job_06', 'OK') == 'NOOK' or
+            column_ifexists('Desfase_Job_08', 'OK') == 'NOOK' or
+            column_ifexists('Fallas_job_08', 'OK') == 'NOOK' or
+            column_ifexists('Desfase_Job_10', 'OK') == 'NOOK' or
+            column_ifexists('Fallas_job_10', 'OK') == 'NOOK',
+            'Alertar', 'No Alertar'),
+        Solidos = iff(
+            column_ifexists('Desfase_Job_05', 'OK') == 'NOOK' or
+            column_ifexists('Fallas_job_05', 'OK') == 'NOOK' or
+            column_ifexists('Desfase_Job_07', 'OK') == 'NOOK' or
+            column_ifexists('Fallas_job_07', 'OK') == 'NOOK' or
+            column_ifexists('Desfase_Job_09', 'OK') == 'NOOK' or
+            column_ifexists('Fallas_job_09', 'OK') == 'NOOK' or
+            column_ifexists('Desfase_Job_11', 'OK') == 'NOOK' or
+            column_ifexists('Fallas_job_11', 'OK') == 'NOOK',
+            'Alertar', 'No Alertar'),
+        Front = iff(
+            column_ifexists('Desfase_Job_12', 'OK') == 'NOOK' or
+            column_ifexists('Fallas_job_12', 'OK') == 'NOOK',
+            'Alertar', 'No Alertar'),
+        Alarmas = iff(
+            column_ifexists('Desfase_Job_13', 'OK') == 'NOOK' or
+            column_ifexists('Fallas_job_13', 'OK') == 'NOOK',
+            'Alertar', 'No Alertar')
+};

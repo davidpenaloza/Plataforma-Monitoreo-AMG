@@ -1,0 +1,11 @@
+let fn_prd_mlp_notpii_dom_autoloader_dev_status = (startTime:datetime, endTime:datetime) {
+  let jobs_config = dynamic([
+    {"jobID":"109059309338379","nombre":"INTERPOLATED_CONTINUOUS","tipo":"CONTINUO","sla_min":0},
+    {"jobID":"22801697715025","nombre":"RECORDED_CHANNELS","tipo":"BATCH_CORTO","sla_min":10},
+    {"jobID":"297763322962057","nombre":"DAILY_INTERPOLATED","tipo":"BATCH_CORTO","sla_min":1560},
+    {"jobID":"745497851516901","nombre":"RECORDED","tipo":"BATCH_LARGO","sla_min":0},
+    {"jobID":"548433270579227","nombre":"FUTURE","tipo":"BATCH_LARGO","sla_min":0}
+  ]);
+  let estado = toscalar(fn_prd_notpii_autoloader_alert(jobs_config, startTime, endTime) | project EstadoGlobal);
+  print color = iff(estado == "Alertar", "#E53935", "#EAF4EA")
+};
