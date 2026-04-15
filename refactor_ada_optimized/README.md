@@ -50,22 +50,11 @@ refactor_ada_optimized/
 
 ## 3.1 Sources compartidos
 
-**Capa 1 (workspace-level, reutilizable):**
-- `fn_src_mlp_ws_*` (por ejemplo `fn_src_mlp_ws_ada_systemlogs`, `fn_src_mlp_ws_pisystem_systemlogs`, `fn_src_mlp_ws_dispatch_pipelineruns`).
+- `fn_src_pipeline_runs_all(startTime:datetime, endTime:datetime)`
+- `fn_src_systemlogs_all(startTime:datetime, endTime:datetime)`
+- `fn_src_ada_consolelogs(startTime:datetime, endTime:datetime)`
 
-**Capa 2 (producto/faena-level, agregada):**
-- `fn_src_mlp_pipeline_runs_all(startTime:datetime, endTime:datetime)`
-- `fn_src_mlp_systemlogs_all(startTime:datetime, endTime:datetime)`
-- `fn_src_mlp_ada_consolelogs(startTime:datetime, endTime:datetime)`
-- `fn_src_mlp_ssag_systemlogs_all(startTime:datetime, endTime:datetime)`
-- `fn_src_mlp_notpii_pisystem_systemlogs(startTime:datetime, endTime:datetime)`
-
-**Qué aportan:**
-- Evitan duplicar `workspace(...)` entre funciones de negocio.
-- Mantienen una interfaz estable para dominios/helpers.
-- Permiten estandarizar por faena (MLP) sin acoplar lógica de alerta a detalles de conexión.
-
-> Nota de diseño: en KQL, `workspace()` suele requerir referencias explícitas en tiempo de parseo, por eso se usa una capa `fn_src_mlp_ws_*` en vez de una “tabla de metadatos + workspace dinámico”.
+**Qué aportan:** unifican accesos recurrentes a tablas base para que los dominios filtren temprano por su contexto.
 
 ## 3.2 Helpers cross-product
 
@@ -76,9 +65,9 @@ refactor_ada_optimized/
 
 ## 3.3 Helpers ADA
 
-- `fn_prd_mlp_ada_alert_from_tables_lag(tables:dynamic, startTime:datetime, endTime:datetime)`
-- `fn_prd_mlp_ada_alert_from_dispatch_nrt_logs(startTime:datetime, endTime:datetime)`
-- `fn_prd_mlp_ada_kpi_alert_rows(startTime:datetime, endTime:datetime)`
+- `fn_prd_ada_alert_from_tables_lag(tables:dynamic, startTime:datetime, endTime:datetime)`
+- `fn_prd_ada_alert_from_dispatch_nrt_logs(startTime:datetime, endTime:datetime)`
+- `fn_prd_ada_kpi_alert_rows(startTime:datetime, endTime:datetime)`
 
 **Qué aportan:**
 - Reglas de lag por tabla con umbrales configurados.
@@ -87,17 +76,17 @@ refactor_ada_optimized/
 
 ## 3.4 Domain functions
 
-- `fn_prd_mlp_ada_dom_dispatch_status(startTime:datetime, endTime:datetime)`
-- `fn_prd_mlp_ada_dom_drillit_status(startTime:datetime, endTime:datetime)`
-- `fn_prd_mlp_ada_dom_blockgrade_status(startTime:datetime, endTime:datetime)`
-- `fn_prd_mlp_ada_dom_pi_status(startTime:datetime, endTime:datetime)`
-- `fn_prd_mlp_ada_dom_plans_status(startTime:datetime, endTime:datetime)`
-- `fn_prd_mlp_ada_dom_meteodata_status(startTime:datetime, endTime:datetime)`
-- `fn_prd_mlp_ada_dom_alarm_status(startTime:datetime, endTime:datetime)`
-- `fn_prd_mlp_ada_dom_front_status(startTime:datetime, endTime:datetime)`
-- `fn_prd_mlp_ada_dom_kpi_status(startTime:datetime, endTime:datetime)`
-- `fn_prd_mlp_ada_dom_kpi_detalle_html(startTime:datetime, endTime:datetime)`
-- `fn_prd_mlp_ada_dom_global_status(startTime:datetime, endTime:datetime)`
+- `fn_prd_ada_dom_dispatch_status(startTime:datetime, endTime:datetime)`
+- `fn_prd_ada_dom_drillit_status(startTime:datetime, endTime:datetime)`
+- `fn_prd_ada_dom_blockgrade_status(startTime:datetime, endTime:datetime)`
+- `fn_prd_ada_dom_pi_status(startTime:datetime, endTime:datetime)`
+- `fn_prd_ada_dom_plans_status(startTime:datetime, endTime:datetime)`
+- `fn_prd_ada_dom_meteodata_status(startTime:datetime, endTime:datetime)`
+- `fn_prd_ada_dom_alarm_status(startTime:datetime, endTime:datetime)`
+- `fn_prd_ada_dom_front_status(startTime:datetime, endTime:datetime)`
+- `fn_prd_ada_dom_kpi_status(startTime:datetime, endTime:datetime)`
+- `fn_prd_ada_dom_kpi_detalle_html(startTime:datetime, endTime:datetime)`
+- `fn_prd_ada_dom_global_status(startTime:datetime, endTime:datetime)`
 
 **Qué aportan:** cada dominio transforma señales técnicas en un estado único (color/status) alineado con el tablero.
 
@@ -130,11 +119,11 @@ Impacto:
 ## 4.3 Duplicación KPI entre estado y detalle
 
 Problema: reglas de KPI “sin datos/no esperado” estaban repetidas y podían divergir entre:
-- `fn_prd_mlp_ada_dom_kpi_status`
-- `fn_prd_mlp_ada_dom_kpi_detalle_html`
+- `fn_prd_ada_dom_kpi_status`
+- `fn_prd_ada_dom_kpi_detalle_html`
 
 Solución aplicada:
-- Centralización en helper único: `fn_prd_mlp_ada_kpi_alert_rows`.
+- Centralización en helper único: `fn_prd_ada_kpi_alert_rows`.
 - Ambos dominios consumen la misma salida.
 
 Impacto:
@@ -181,7 +170,7 @@ Checklist de diagnóstico rápido:
 
 1. ¿El dominio está en `ALERT` por jobs caídos o por lag?
 2. ¿Hay mantención activa (`en_mantencion`) que deba suprimir parte del ruido?
-3. ¿El helper de KPI está devolviendo filas (`fn_prd_mlp_ada_kpi_alert_rows`)?
+3. ¿El helper de KPI está devolviendo filas (`fn_prd_ada_kpi_alert_rows`)?
 4. ¿El umbral de la tabla existe y es correcto en `mapUmbralAlerta`?
 5. ¿El wrapper de Grafana está leyendo el campo esperado (`color` o `detalle_html`)?
 6. ¿La versión en `body_only` está alineada con la versión completa?
@@ -205,7 +194,7 @@ Checklist de diagnóstico rápido:
 
 ## 8.2 Mediano plazo
 
-4. ~~Source helper parametrizable por workspace resource id~~ (descartado por limitación práctica de `workspace()` dinámico en KQL); se adopta capa `fn_src_mlp_ws_*` + sources agregados por faena
+4. **Source helper parametrizable por workspace resource id**
    - Crear helper base + wrappers por dominio (enfoque híbrido).
    - Beneficio: menos hardcode y mejor portabilidad entre entornos.
 
