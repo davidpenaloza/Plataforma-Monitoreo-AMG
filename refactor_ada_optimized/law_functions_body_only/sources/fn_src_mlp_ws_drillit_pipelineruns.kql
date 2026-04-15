@@ -1,0 +1,3 @@
+  workspace("/subscriptions/c68213bf-7453-4ba4-9aaa-56b822af4c20/resourceGroups/MLP-PRD-RG-DRILLIT/providers/Microsoft.OperationalInsights/workspaces/mlp-prd-law-drillit").table("AzureDiagnostics")
+  | where TimeGenerated between (startTime .. endTime)
+  | project TimeGenerated, Category, ResourceGroup, OperationName
