@@ -1,3 +1,0 @@
-  workspace("/subscriptions/c68213bf-7453-4ba4-9aaa-56b822af4c20/resourceGroups/MLP-PRD-RG-ADA/providers/Microsoft.OperationalInsights/workspaces/mlp-prd-law-ada").table("ContainerAppConsoleLogs_CL")
-  | where TimeGenerated between (startTime .. endTime)
-  | project TimeGenerated, ContainerJobName_s, ContainerGroupName_s, Log_s

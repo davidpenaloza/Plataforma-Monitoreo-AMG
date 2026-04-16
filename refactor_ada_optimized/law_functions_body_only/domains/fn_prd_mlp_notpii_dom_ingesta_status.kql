@@ -1,0 +1,4 @@
+let fn_prd_mlp_notpii_dom_ingesta_status = (startTime:datetime, endTime:datetime) {
+  let estado = toscalar(fn_prd_mlp_notpii_ingesta_job04_alert(endTime) | project Estado);
+  print color = iff(estado == "Alertar", "#E53935", "#EAF4EA")
+};

@@ -1,0 +1,2 @@
+  fn_src_mlp_ws_pisystem_table("ContainerAppConsoleLogs_CL", startTime, endTime)
+  | project TimeGenerated, ContainerJobName_s, Log_s

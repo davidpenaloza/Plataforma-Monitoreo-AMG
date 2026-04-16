@@ -1,0 +1,15 @@
+let fn_prd_mlp_ssag_eval_ejecucion = (job_name:string, endTime:datetime, ventana_min:int, max_fallas:int, operador:string) {
+    let startTime = endTime - totimespan(ventana_min * 60s);
+    let fallas = toscalar(
+        fn_src_mlp_ssag_systemlogs_all(startTime, endTime)
+        | where JobName_s == job_name
+        | where Type_s == 'Warning' and Reason_s in ('FailedCreate', 'DeadlineExceeded', 'BackoffLimitExceeded')
+        | summarize Fallas = count()
+        | project Fallas
+    );
+    print Status = case(
+        operador == "lte", iff(fallas <= max_fallas, 'OK', 'NOOK'),
+        operador == "lt",  iff(fallas <  max_fallas, 'OK', 'NOOK'),
+        operador == "eq",  iff(fallas == max_fallas, 'OK', 'NOOK'),
+        'NOOK')
+};

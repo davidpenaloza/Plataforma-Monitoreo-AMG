@@ -1,0 +1,5 @@
+  union
+    (fn_src_mlp_ws_ada_systemlogs(startTime, endTime) | project TimeGenerated, JobName_s, Log_s),
+    (fn_src_mlp_ws_meteo_systemlogs(startTime, endTime) | project TimeGenerated, JobName_s, Log_s),
+    (fn_src_mlp_ws_pisystem_systemlogs(startTime, endTime) | project TimeGenerated, JobName_s, Log_s),
+    (fn_src_mlp_ws_plans_systemlogs(startTime, endTime) | project TimeGenerated, JobName_s, Log_s)

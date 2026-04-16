@@ -1,0 +1,18 @@
+  let en_mantencion = toscalar(
+    workspace("/subscriptions/c68213bf-7453-4ba4-9aaa-56b822af4c20/resourceGroups/MLP-PRD-RG-ADA/providers/Microsoft.OperationalInsights/workspaces/mlp-prd-law-ada").Logs_MLP_ADA_CL
+    | where product_origin == "DISPATCH_CONDICION_OPERACIONAL"
+    | top 1 by TimeGenerated desc
+    | extend CH1 = tostring(detail["CH-1"]), CH2 = tostring(detail["CH-02"])
+    | extend en_mantencion = iff(trim(" ", tolower(CH1)) != "efectivo" or trim(" ", tolower(CH2)) != "efectivo", true, false)
+    | project en_mantencion
+  );
+  let ing_ok = toscalar(
+    fn_src_mlp_pipeline_runs_all(startTime - 60m, endTime)
+    | where ResourceGroup == "MLP-PRD-RG-BLKGRDE" // filtro temprano por dominio
+    | where Category == "PipelineRuns"
+    | where OperationName has "Succeeded"
+    | count
+  ) > 0;
+  let lag = fn_prd_mlp_ada_alert_from_tables_lag(dynamic(["blockgrade_bybucket"]), startTime, endTime);
+  let status = iff(not(en_mantencion) and (not(ing_ok) or lag == "ALERT"), "ALERT", "OK");
+  print color = fn_mon_status_to_color(status)
