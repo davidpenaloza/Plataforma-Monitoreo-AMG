@@ -56,46 +56,62 @@ Si ves archivos como `fn_src_ada_*`, `fn_src_pipeline_runs_all` o `fn_src_system
 
 ## 3) Catálogo funcional (estado actual)
 
-## 3.1 Sources compartidos
+> Este catálogo incluye **solo funciones activas** (referenciadas por wrappers o por el grafo de dependencias de esas funciones).
 
-**Capa 1 (workspace-level, reutilizable):**
-- `fn_src_mlp_ws_*` (por ejemplo `fn_src_mlp_ws_ada_systemlogs`, `fn_src_mlp_ws_pisystem_systemlogs`, `fn_src_mlp_ws_dispatch_pipelineruns`).
-- Para workspaces con múltiples tablas, se usa base común `fn_src_mlp_ws_<workspace>_table(tableName, ...)` y wrappers por tabla (system/console) para evitar repetir subscription/RG/workspace.
+## 3.1 Sources (activas)
 
-**Capa 2 (producto/faena-level, agregada):**
+### Workspace-level (`fn_src_mlp_ws_*`)
+- `fn_src_mlp_ws_ada_table(tableName:string, startTime:datetime, endTime:datetime)`
+- `fn_src_mlp_ws_ada_systemlogs(startTime:datetime, endTime:datetime)`
+- `fn_src_mlp_ws_ada_consolelogs(startTime:datetime, endTime:datetime)`
+- `fn_src_mlp_ws_dispatch_pipelineruns(startTime:datetime, endTime:datetime)`
+- `fn_src_mlp_ws_drillit_pipelineruns(startTime:datetime, endTime:datetime)`
+- `fn_src_mlp_ws_blkgrde_pipelineruns(startTime:datetime, endTime:datetime)`
+- `fn_src_mlp_ws_meteo_systemlogs(startTime:datetime, endTime:datetime)`
+- `fn_src_mlp_ws_plans_systemlogs(startTime:datetime, endTime:datetime)`
+- `fn_src_mlp_ws_pisystem_table(tableName:string, startTime:datetime, endTime:datetime)`
+- `fn_src_mlp_ws_pisystem_systemlogs(startTime:datetime, endTime:datetime)`
+- `fn_src_mlp_ws_pisystem_consolelogs(startTime:datetime, endTime:datetime)`
+- `fn_src_mlp_ws_ssag_table(tableName:string, startTime:datetime, endTime:datetime)`
+- `fn_src_mlp_ws_ssag_systemlogs(startTime:datetime, endTime:datetime)`
+- `fn_src_mlp_ws_ssag_consolelogs(startTime:datetime, endTime:datetime)`
+- `fn_src_mlp_ws_pdmsagi_systemlogs(startTime:datetime, endTime:datetime)`
+- `fn_src_mlp_ws_notpii_databricksjobs_dev(startTime:datetime, endTime:datetime)`
+- `fn_src_mlp_ws_notpii_databricksjobs_uat(startTime:datetime, endTime:datetime)`
+
+### Product/faena-level (`fn_src_mlp_*`)
 - `fn_src_mlp_pipeline_runs_all(startTime:datetime, endTime:datetime)`
 - `fn_src_mlp_systemlogs_all(startTime:datetime, endTime:datetime)`
 - `fn_src_mlp_ada_consolelogs(startTime:datetime, endTime:datetime)`
 - `fn_src_mlp_ssag_systemlogs_all(startTime:datetime, endTime:datetime)`
+- `fn_src_mlp_ssag_consolelogs_all(startTime:datetime, endTime:datetime)`
 - `fn_src_mlp_notpii_pisystem_systemlogs(startTime:datetime, endTime:datetime)`
+- `fn_src_mlp_notpii_pisystem_consolelogs(startTime:datetime, endTime:datetime)`
+- `fn_src_mlp_notpii_databricksjobs_all(startTime:datetime, endTime:datetime)`
 
-**Qué aportan:**
-- Evitan duplicar `workspace(...)` entre funciones de negocio.
-- Mantienen una interfaz estable para dominios/helpers.
-- Permiten estandarizar por faena (MLP) sin acoplar lógica de alerta a detalles de conexión.
+## 3.2 Helpers activos
 
-> Nota de diseño: en KQL, `workspace()` suele requerir referencias explícitas en tiempo de parseo, por eso se usa una capa `fn_src_mlp_ws_*` en vez de una “tabla de metadatos + workspace dinámico”.
-
-## 3.2 Helpers cross-product
-
+### Cross-product
 - `fn_mon_status_to_color(status:string)`
 - `fn_mon_global_from_color_set(colors:dynamic, alert_color:string="#E53935", ok_color:string="#EAF4EA")`
 
-**Qué aportan:** normalizan traducción de estado lógico (`OK/ALERT`) a color y consolidación global.
-
-## 3.3 Helpers ADA
-
+### ADA
 - `fn_prd_mlp_ada_alert_from_tables_lag(tables:dynamic, startTime:datetime, endTime:datetime)`
 - `fn_prd_mlp_ada_alert_from_dispatch_nrt_logs(startTime:datetime, endTime:datetime)`
 - `fn_prd_mlp_ada_kpi_alert_rows(startTime:datetime, endTime:datetime)`
 
-**Qué aportan:**
-- Reglas de lag por tabla con umbrales configurados.
-- Detección NRT para Dispatch (logs de `job17`, diferencia temporal SQL vs ejecución).
-- Cálculo centralizado de KPI “no esperado” (exclusiones horarias, mantención, umbrales, continuidad de error).
+### NOTPII
+- `fn_prd_mlp_notpii_autoloader_alert(startTime:datetime, endTime:datetime, env:string)`
+- `fn_prd_mlp_notpii_ingesta_job04_alert(startTime:datetime, endTime:datetime)`
 
-## 3.4 Domain functions
+### SIROSAG
+- `fn_prd_mlp_ssag_eval_desactualizacion(lastUtc:datetime, maxMin:int)`
+- `fn_prd_mlp_ssag_eval_desfase(lastUtc:datetime, maxMin:int)`
+- `fn_prd_mlp_ssag_eval_ejecucion(startTime:datetime, endTime:datetime, jobNames:dynamic, minSuccess:int)`
 
+## 3.3 Domain functions activas
+
+### ADA
 - `fn_prd_mlp_ada_dom_dispatch_status(startTime:datetime, endTime:datetime)`
 - `fn_prd_mlp_ada_dom_drillit_status(startTime:datetime, endTime:datetime)`
 - `fn_prd_mlp_ada_dom_blockgrade_status(startTime:datetime, endTime:datetime)`
@@ -107,7 +123,20 @@ Si ves archivos como `fn_src_ada_*`, `fn_src_pipeline_runs_all` o `fn_src_system
 - `fn_prd_mlp_ada_dom_kpi_status(startTime:datetime, endTime:datetime)`
 - `fn_prd_mlp_ada_dom_global_status(startTime:datetime, endTime:datetime)`
 
-**Qué aportan:** cada dominio transforma señales técnicas en un estado único (color/status) alineado con el tablero.
+### NOTPII
+- `fn_prd_mlp_notpii_dom_autoloader_dev_status(startTime:datetime, endTime:datetime)`
+- `fn_prd_mlp_notpii_dom_autoloader_uat_status(startTime:datetime, endTime:datetime)`
+- `fn_prd_mlp_notpii_dom_ingesta_status(startTime:datetime, endTime:datetime)`
+- `fn_prd_mlp_notpii_dom_difusion_global_status(startTime:datetime, endTime:datetime)`
+
+### SIROSAG
+- `fn_prd_mlp_ssag_dom_resumen_status(startTime:datetime, endTime:datetime)`
+
+## 3.4 Wrappers activos (Grafana)
+
+- ADA: `var_mlp_ada_global`, `var_mlp_ada_dispatch`, `var_mlp_ada_drillit`, `var_mlp_ada_pi`, `var_mlp_ada_plans`, `var_mlp_ada_blockgrade`, `var_mlp_ada_meteodata`, `var_mlp_ada_kpi`, `var_mlp_ada_alarm`, `var_mlp_ada_front`.
+- NOTPII: `var_mlp_notpii_autoloader_dev`, `var_mlp_notpii_autoloader_uat`, `var_mlp_notpii_ingesta`, `var_mlp_notpii_difusion_global`.
+- SIROSAG: `var_mlp_sirosag_resumen`.
 
 ---
 
