@@ -1,0 +1,6 @@
+let fn_src_mlp_pipeline_runs_all = (startTime:datetime, endTime:datetime) {
+  union
+    (fn_src_mlp_ws_dispatch_pipelineruns(startTime, endTime)),
+    (fn_src_mlp_ws_drillit_pipelineruns(startTime, endTime)),
+    (fn_src_mlp_ws_blkgrde_pipelineruns(startTime, endTime))
+};

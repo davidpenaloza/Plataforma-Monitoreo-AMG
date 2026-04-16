@@ -1,0 +1,7 @@
+let fn_src_mlp_ssag_systemlogs_all = (startTime:datetime, endTime:datetime) {
+  union
+    (fn_src_mlp_ws_ssag_systemlogs(startTime, endTime)),
+    (fn_src_mlp_ws_plans_systemlogs(startTime, endTime)),
+    (fn_src_mlp_ws_pdmsagi_systemlogs(startTime, endTime)),
+    (fn_src_mlp_ws_pisystem_systemlogs(startTime, endTime))
+};

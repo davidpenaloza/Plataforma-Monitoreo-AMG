@@ -1,0 +1,4 @@
+let fn_src_mlp_ws_ssag_consolelogs = (startTime:datetime, endTime:datetime) {
+  fn_src_mlp_ws_ssag_table("ContainerAppConsoleLogs_CL", startTime, endTime)
+  | project TimeGenerated, ContainerJobName_s, Log_s
+};

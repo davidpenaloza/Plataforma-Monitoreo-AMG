@@ -12,23 +12,26 @@ CALL_RE = re.compile(r"\b(fn_[A-Za-z0-9_]+)\s*\(")
 
 REQUIRED_HELPERS = {
     "fn_mon_status_to_color",
-    "fn_mon_alert_from_job_success",
-    "fn_mon_alert_from_pipeline_success",
     "fn_mon_global_from_color_set",
-    "fn_prd_ada_alert_from_tables_lag",
+    "fn_prd_mlp_ada_alert_from_tables_lag",
 }
 
 REQUIRED_DOMAINS = {
-    "fn_prd_ada_dom_dispatch_status",
-    "fn_prd_ada_dom_drillit_status",
-    "fn_prd_ada_dom_blockgrade_status",
-    "fn_prd_ada_dom_pi_status",
-    "fn_prd_ada_dom_plans_status",
-    "fn_prd_ada_dom_meteodata_status",
-    "fn_prd_ada_dom_alarm_status",
-    "fn_prd_ada_dom_front_status",
-    "fn_prd_ada_dom_kpi_status",
-    "fn_prd_ada_dom_global_status",
+    "fn_prd_mlp_ada_dom_dispatch_status",
+    "fn_prd_mlp_ada_dom_drillit_status",
+    "fn_prd_mlp_ada_dom_blockgrade_status",
+    "fn_prd_mlp_ada_dom_pi_status",
+    "fn_prd_mlp_ada_dom_plans_status",
+    "fn_prd_mlp_ada_dom_meteodata_status",
+    "fn_prd_mlp_ada_dom_alarm_status",
+    "fn_prd_mlp_ada_dom_front_status",
+    "fn_prd_mlp_ada_dom_kpi_status",
+    "fn_prd_mlp_ada_dom_global_status",
+    "fn_prd_mlp_notpii_dom_autoloader_dev_status",
+    "fn_prd_mlp_notpii_dom_autoloader_uat_status",
+    "fn_prd_mlp_notpii_dom_ingesta_status",
+    "fn_prd_mlp_notpii_dom_difusion_global_status",
+    "fn_prd_mlp_ssag_dom_resumen_status",
 }
 
 REQUIRED_WRAPPERS = {
@@ -42,6 +45,11 @@ REQUIRED_WRAPPERS = {
     "var_mlp_ada_kpi.kql",
     "var_mlp_ada_alarm.kql",
     "var_mlp_ada_front.kql",
+    "var_mlp_notpii_autoloader_dev.kql",
+    "var_mlp_notpii_autoloader_uat.kql",
+    "var_mlp_notpii_ingesta.kql",
+    "var_mlp_notpii_difusion_global.kql",
+    "var_mlp_sirosag_resumen.kql",
 }
 
 law_files = sorted(LAW.rglob("*.kql"))
@@ -73,6 +81,11 @@ for req in sorted(REQUIRED_WRAPPERS - wrapper_names):
 for req in sorted((REQUIRED_HELPERS | REQUIRED_DOMAINS) - set(func_defs)):
     errors.append(f"Missing required function definition: {req}")
 
+# Naming guardrails: enforce MLP prefix in source files
+for path in (LAW / "sources").glob("fn_src*.kql"):
+    if not path.name.startswith("fn_src_mlp_"):
+        errors.append(f"Non-standard source filename (missing mlp prefix): {path.relative_to(ROOT)}")
+
 # Undefined references
 for path in all_files:
     text = path.read_text(encoding="utf-8")
@@ -93,11 +106,11 @@ for path in wrapper_files:
             errors.append(f"Wrapper {path.name} points to non-domain function: {fn}")
 
 # Ensure global depends only on domain functions + cross helper
-global_file = ROOT / "law_functions/domains/fn_prd_ada_dom_global_status.kql"
+global_file = ROOT / "law_functions/domains/fn_prd_mlp_ada_dom_global_status.kql"
 if global_file.exists():
     text = global_file.read_text(encoding="utf-8")
     calls = sorted(set(CALL_RE.findall(text)))
-    allowed = set(REQUIRED_DOMAINS) | {"fn_mon_global_from_color_set", "fn_prd_ada_dom_global_status"}
+    allowed = set(REQUIRED_DOMAINS) | {"fn_mon_global_from_color_set", "fn_prd_mlp_ada_dom_global_status"}
     unexpected = [c for c in calls if c not in allowed]
     if unexpected:
         errors.append(f"Global function has unexpected dependencies: {unexpected}")
