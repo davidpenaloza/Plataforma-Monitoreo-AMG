@@ -1,0 +1,8 @@
+let fn_prd_ssag_eval_desfase = (job_name:string, endTime:datetime, ventana_min:int, max_minutos:int) {
+    let startTime = endTime - totimespan(ventana_min * 60s);
+    fn_src_ssag_systemlogs_all(startTime, endTime)
+    | where JobName_s == job_name
+    | summarize LastTimeGenerated = max(TimeGenerated)
+    | extend DiferenciaEnMinutos = toint(round(todouble((endTime - LastTimeGenerated) / 1min), 0))
+    | project Status = iff(isnull(LastTimeGenerated) or DiferenciaEnMinutos > max_minutos, 'NOOK', 'OK')
+};

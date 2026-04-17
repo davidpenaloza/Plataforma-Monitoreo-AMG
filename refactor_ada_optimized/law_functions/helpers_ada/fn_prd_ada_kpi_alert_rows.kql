@@ -1,0 +1,67 @@
+let fn_prd_ada_kpi_alert_rows = (startTime:datetime, endTime:datetime) {
+    let now_utc = now();
+    let CurrentTimeChile = datetime_utc_to_local(now_utc, 'America/Santiago');
+    let CurrentTimeChileWeekDay = dayofweek(CurrentTimeChile) / 1d;
+    let CurrentTimeChileHour = datetime_part("hour", CurrentTimeChile);
+    let CurrentTimeChileMinute = datetime_part("minute", CurrentTimeChile);
+
+    let en_mantencion =
+        toscalar(
+            workspace('/subscriptions/c68213bf-7453-4ba4-9aaa-56b822af4c20/resourceGroups/MLP-PRD-RG-ADA/providers/Microsoft.OperationalInsights/workspaces/mlp-prd-law-ada').Logs_MLP_ADA_CL
+            | where product_origin == "DISPATCH_CONDICION_OPERACIONAL"
+            | top 1 by TimeGenerated desc
+            | extend CH1 = tostring(detail["CH-1"]), CH2 = tostring(detail["CH-02"])
+            | extend en_mantencion = iff(trim(" ", tolower(CH1)) != "efectivo" or trim(" ", tolower(CH2)) != "efectivo", true, false)
+            | project en_mantencion
+        );
+
+    let condicion_1_SinDatosPermanentes = true;
+    let condicion_2_0700_a_1000 = CurrentTimeChileHour >= 7 and CurrentTimeChileHour < 10;
+    let condicion_3_1900_a_2100 = CurrentTimeChileHour >= 19 and CurrentTimeChileHour < 21;
+    let condicion_4_miercoles_1900_a_viernes_2100 =
+        (CurrentTimeChileWeekDay == 3 and CurrentTimeChileHour >= 19)
+        or (CurrentTimeChileWeekDay == 4)
+        or (CurrentTimeChileWeekDay == 5 and CurrentTimeChileHour < 9);
+    let condicion_5_fuera_horario_laboral =
+        (CurrentTimeChileWeekDay == 6 or CurrentTimeChileWeekDay == 0)
+        or (CurrentTimeChileHour < 9)
+        or (CurrentTimeChileHour >= 19);
+    let condicion_6_jueves_2100_a_viernes_1030 =
+        (CurrentTimeChileWeekDay == 4 and CurrentTimeChileHour >= 21)
+        or (CurrentTimeChileWeekDay == 5 and CurrentTimeChileHour <= 10)
+        or (CurrentTimeChileWeekDay == 5 and CurrentTimeChileHour == 10 and CurrentTimeChileMinute < 30);
+    let condicion_7_0900_a_0930 = CurrentTimeChileHour >= 9 and CurrentTimeChileHour < 10;
+    let condicion_8_2100_a_2130 = CurrentTimeChileHour >= 21 and CurrentTimeChileHour < 22;
+
+    fn_src_ada_consolelogs(startTime, endTime)
+    | where TimeGenerated between (startTime .. endTime)
+    | where ContainerJobName_s startswith "mlp-prd-caj-ada-job" and not(ContainerJobName_s startswith "mlp-prd-caj-ada-job07")
+    | where Log_s startswith '{"fecha_log_UTC":'
+    | project ParsedJson = parse_json(Log_s)
+    | extend
+        fecha_log_UTC = todatetime(ParsedJson.fecha_log_UTC),
+        log_nivel = tostring(ParsedJson.log_nivel),
+        traceback = tostring(ParsedJson.traceback)
+    | where log_nivel == "ERROR"
+    | extend root_error_line = tostring(split(traceback, "\n")[3])
+    | extend KPINoEsperado = tostring(replace_string(extract(", in (.+)$", 1, root_error_line), "get_", ""))
+    | extend KPINoEsperado = iff(condicion_7_0900_a_0930, iff(KPINoEsperado in ("numero_wheeldozers_operando_real","numero_wheeldozers_disponible_real","numero_wheeldozers_nominal","numero_excavadora_operando_real","numero_excavadora_disponible_real","numero_excavadora_nominal","numero_aljibes_operando_real","numero_aljibes_disponible_real","numero_aljibes_nominal","numero_motoniveladora_operando_real","numero_motoniveladora_disponible_real","numero_motoniveladora_nominal","numero_bulldozer_operando_real","numero_bulldozer_disponible_real","numero_bulldozer_nominal","numero_cargador_frontal_operando_real","numero_cargador_frontal_disponible_real","numero_cargador_frontal_nominal"), "", KPINoEsperado), KPINoEsperado)
+    | extend KPINoEsperado = iff(condicion_8_2100_a_2130, iff(KPINoEsperado in ("numero_wheeldozers_operando_real","numero_wheeldozers_disponible_real","numero_wheeldozers_nominal","numero_excavadora_operando_real","numero_excavadora_disponible_real","numero_excavadora_nominal","numero_aljibes_operando_real","numero_aljibes_disponible_real","numero_aljibes_nominal","numero_motoniveladora_operando_real","numero_motoniveladora_disponible_real","numero_motoniveladora_nominal","numero_bulldozer_operando_real","numero_bulldozer_disponible_real","numero_bulldozer_nominal","numero_cargador_frontal_operando_real","numero_cargador_frontal_disponible_real","numero_cargador_frontal_nominal"), "", KPINoEsperado), KPINoEsperado)
+    | extend KPINoEsperado = iff(condicion_6_jueves_2100_a_viernes_1030, iff(KPINoEsperado in ("ton_stockpile_plan","rendimiento_plan_dia","p80_sag_1_plan","f80_sag_1_plan","rendimiento_sag_1_plan","rendimiento_sag_2_plan","rendimiento_sag_3_plan","rendimiento_sag_4_plan","p80_planta_plan","ley_cobre_plan_dia","recuperacion_plan_dia","transportado_plan_dia","molienda_plan_dia","mo_fino_producido_plan_dia","cu_fino_filtrado_pagable_plan_dia","cu_fino_producido_plan_dia","expit_plan_dia","concentrado_entregado_puerto_plan","concentrado_producido_plan","relave_real_plan","concentrado_colectivo_plan","recuperacion_cu_plan","ley_cu_plan","ley_concentrado_plan","ley_concentrado_mo_plan","recuperacion_selectiva_mo_plan","produccion_selectiva_mo_plan","fase9_plan_completo","fase10_plan_completo","fase11_plan_completo","fase12_plan_completo","remanejo_plan_completo","mov_mina_plan_completo","extraccion_plan_completo","disponibilidad_perforadoras_plan_hora","metros_perforados_plan_dia","uebd_perforadoras_plan_hora"), "", KPINoEsperado), KPINoEsperado)
+    | extend KPINoEsperado = iff(condicion_1_SinDatosPermanentes, iff(KPINoEsperado in ("ley_cu_plan_dia","ley_mo_plan_dia","ley_conc_plan_dia","axb_plan_dia","arsenico_plan_dia","recup_plan_dia","dureza_plan_dia","ley_cu_bg_stock_real","alimentacion_chancado_plan","make_up_plan","identify_problematic_zone"), "", KPINoEsperado), KPINoEsperado)
+    | extend KPINoEsperado = iff(condicion_2_0700_a_1000, iff(KPINoEsperado in ("cu_fino_filtrado_pagable_real_acc_dia","mo_fino_producido_real_acc_dia","mo_fino_producido_proy_dia","cu_fino_producido_proy_dia","cu_fino_filtrado_pagable_proy_dia"), "", KPINoEsperado), KPINoEsperado)
+    | extend KPINoEsperado = iff(condicion_3_1900_a_2100, iff(KPINoEsperado == "ton_stockpile_proyeccion", "", KPINoEsperado), KPINoEsperado)
+    | extend KPINoEsperado = iff(condicion_4_miercoles_1900_a_viernes_2100, iff(KPINoEsperado == "rendimiento_perforacion_plan_dia", "", KPINoEsperado), KPINoEsperado)
+    | extend KPINoEsperado = iff(condicion_5_fuera_horario_laboral, iff(KPINoEsperado in ("identify_problematic_zone","metros_perforados_real_dia","numero_perforadoras_operando_real_dia","numero_perforadoras_disponible_real_dia","rendimiento_perforacion_real_dia"), "", KPINoEsperado), KPINoEsperado)
+    | extend KPINoEsperado = iff(en_mantencion == true and KPINoEsperado in ("ley_cu_bg_chancado_real","transporte_stmg_mean","transporte_stmg_std","transporte_stmg_ls","transporte_stmg_li","alimentacion_chancado_std","alimentacion_chancado_ls","alimentacion_chancado_li"), "", KPINoEsperado)
+    | extend KPINoEsperado = iff(KPINoEsperado in ("ejemplo1","transporte_stmg_plan","tk13_flujo_real","metros_perforados_plan_dia","disponibilidad_perforadoras_plan_hora","uebd_perforadoras_plan_hora","ley_cu_bg_stock_real","ley_cu_plan_dia","ley_mo_plan_dia","ley_conc_plan_dia","axb_plan_dia","arsenico_plan_dia","recup_plan_dia","dureza_plan_dia"), "", KPINoEsperado)
+    | extend KPINoEsperado = iff(trim(" ", KPINoEsperado) == "", "", KPINoEsperado)
+    | where KPINoEsperado != ""
+    | summarize inicio_problema = min(fecha_log_UTC), ultimo_error = max(fecha_log_UTC) by KPINoEsperado
+    | extend minutos_sin_datos = toint(round(datetime_diff("second", now_utc, inicio_problema) / 60.0, 0))
+    | extend minutos_desde_ultimo_error = toint(round(datetime_diff("second", now_utc, ultimo_error) / 60.0, 0))
+    | extend sigue_caido = minutos_desde_ultimo_error <= 3
+    | extend umbral = iff(KPINoEsperado == "identify_problematic_zone", 30, 20)
+    | where minutos_sin_datos > umbral and sigue_caido == true
+    | project KPINoEsperado, minutos_sin_datos, umbral, minutos_desde_ultimo_error;
+};
