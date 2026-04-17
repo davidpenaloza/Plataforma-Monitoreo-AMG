@@ -1,0 +1,9 @@
+let fn_prd_mlp_ada_dom_front_status = (startTime:datetime, endTime:datetime) {
+  let has_alert = toscalar(
+    workspace("/subscriptions/c68213bf-7453-4ba4-9aaa-56b822af4c20/resourceGroups/MLP-PRD-RG-ADA/providers/Microsoft.OperationalInsights/workspaces/mlp-prd-law-ada").table("AppServiceConsoleLogs")
+    | where TimeGenerated between (endTime - 10m .. endTime)
+    | where (Level == "Error" and ResultDescription contains "/usr/src/app/app/") or ResultDescription contains "Invalid access token"
+    | count
+  ) > 0;
+  print color = fn_mon_status_to_color(iff(has_alert, "ALERT", "OK"))
+};

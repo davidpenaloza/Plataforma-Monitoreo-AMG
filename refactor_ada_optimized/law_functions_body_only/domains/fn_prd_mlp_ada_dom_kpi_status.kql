@@ -1,0 +1,25 @@
+let fn_prd_mlp_ada_dom_kpi_status = (startTime:datetime, endTime:datetime) {
+  let jobs = datatable(JobName_s:string) [
+    "mlp-prd-caj-ada-job01","mlp-prd-caj-ada-job02","mlp-prd-caj-ada-job03","mlp-prd-caj-ada-job04",
+    "mlp-prd-caj-ada-job05","mlp-prd-caj-ada-job08","mlp-prd-caj-ada-job09","mlp-prd-caj-ada-job10",
+    "mlp-prd-caj-ada-job11","mlp-prd-caj-ada-job12","mlp-prd-caj-ada-job13","mlp-prd-caj-ada-job14"
+  ];
+  let jobs_any_alert = toscalar(
+    jobs
+    | join kind=leftouter (
+      fn_src_mlp_systemlogs_all(endTime - 15m, endTime)
+      | where TimeGenerated between (endTime - 15m .. endTime)
+      | where Log_s contains "has successfully completed"
+      | summarize ok_count = count() by JobName_s
+    ) on JobName_s
+    | extend ok_count = coalesce(ok_count, 0)
+    | summarize any_alert = max(iff(ok_count == 0, 1, 0))
+  ) == 1;
+  let count_no_esperados = toscalar(
+    fn_prd_mlp_ada_kpi_alert_rows(endTime - 180m, endTime)
+    | summarize c = dcount(KPINoEsperado)
+    | project c
+  );
+  let status = iff(jobs_any_alert or count_no_esperados > 0, "ALERT", "OK");
+  print color = fn_mon_status_to_color(status)
+};

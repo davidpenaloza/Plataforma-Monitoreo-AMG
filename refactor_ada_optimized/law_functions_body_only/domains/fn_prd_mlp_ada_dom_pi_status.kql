@@ -1,0 +1,9 @@
+  let job_ok = toscalar(
+    fn_src_mlp_systemlogs_all(startTime - 25m, endTime)
+    | where JobName_s == "mlp-prd-caj-pisystem-job01" // filtro temprano por dominio
+    | where Log_s contains "has successfully completed"
+    | count
+  ) > 0;
+  let lag = fn_prd_mlp_ada_alert_from_tables_lag(dynamic(["pisystem_interpolated"]), startTime, endTime);
+  let status = iff(not(job_ok) or lag == "ALERT", "ALERT", "OK");
+  print color = fn_mon_status_to_color(status)
