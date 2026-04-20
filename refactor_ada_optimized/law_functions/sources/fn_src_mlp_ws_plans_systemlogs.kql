@@ -1,5 +1,0 @@
-let fn_src_mlp_ws_plans_systemlogs = (startTime:datetime, endTime:datetime) {
-  workspace("/subscriptions/c68213bf-7453-4ba4-9aaa-56b822af4c20/resourceGroups/MLP-PRD-RG-PLANS/providers/Microsoft.OperationalInsights/workspaces/mlp-prd-law-plans").table("ContainerAppSystemLogs_CL")
-  | where TimeGenerated between (startTime .. endTime)
-  | project TimeGenerated, JobName_s, Type_s, Reason_s, Log_s
-};

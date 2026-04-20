@@ -1,383 +1,220 @@
-# Plataforma Monitoreo AMG — Refactor ADA (estado actual, documentación detallada)
+# Plataforma Monitoreo AMG — Guía funcional (ADA, SIROSAG y NOTPII)
 
-> Documento de referencia para entender **qué se refactorizó**, **qué problemas resuelve**, **cómo está organizado** el código KQL y **cuáles son los próximos pasos recomendados**.
-
----
-
-## 1) Objetivo del refactor
-
-El refactor de ADA busca separar responsabilidades para que el monitoreo sea:
-
-- **Más mantenible** (menos lógica duplicada entre dominios y UI).
-- **Más confiable** (mejor detección de alertas reales y menor ruido).
-- **Más trazable** (fuentes comunes + helpers por producto + dominios claros).
-- **Más portable** (estructura simétrica entre funciones completas y body-only).
-
-En términos prácticos, se pasó desde consultas extensas y repetitivas hacia una arquitectura por capas:
-
-1. **sources/** → acceso a datos base (logs, pipeline runs).
-2. **helpers/** → reglas compartidas (lags, parsing, agregaciones).
-3. **domains/** → estado por producto/dominio (Dispatch, KPI, PI, etc.).
-4. **global** → consolidación final para color global.
+Este README describe **cómo está organizado el paquete KQL**, qué hace cada categoría de funciones y cuáles son las funciones activas por producto.
 
 ---
 
-## 2) Estructura del proyecto
+## 1) Estructura del paquete
 
 ```text
 refactor_ada_optimized/
 ├─ law_functions/
-│  ├─ sources/
-│  ├─ helpers_cross_product/
-│  ├─ helpers_ada/
-│  └─ domains/
-├─ law_functions_body_only/
-│  ├─ sources/
-│  ├─ helpers_cross_product/
-│  ├─ helpers_ada/
-│  └─ domains/
-└─ grafana_wrappers/
+│  ├─ ada/
+│  │  ├─ domains/             # Domains de ADA
+│  │  └─ helpers/             # Helpers de ADA
+│  ├─ notpii/
+│  │  ├─ domains/             # Domains de NOTPII
+│  │  └─ helpers/             # Helpers de NOTPII
+│  ├─ sirosag/
+│  │  ├─ domains/             # Domains de SIROSAG
+│  │  └─ helpers/             # Helpers de SIROSAG
+│  ├─ cross_product/
+│  │  └─ helpers/             # Utilidades compartidas
+│  └─ sources/                # Fuentes comunes (mismo nivel que carpetas de productos)
+├─ law_functions_body_only/   # Espejo por producto para pegar body en LAW UI
+└─ grafana_wrappers/          # Variables/paneles de Grafana (entrypoints)
 ```
 
-### Convención principal
-- **`law_functions/`**: archivo KQL completo (`let fn... { ... };`).
-- **`law_functions_body_only/`**: mismo contenido lógico, solo body para pegar en LAW UI.
-- **`grafana_wrappers/`**: wrappers consumidos por variables/paneles de Grafana.
+
+### Convención de ubicación
+
+- Todo lo específico de producto vive bajo su carpeta (`ada/`, `notpii/`, `sirosag/`).
+- Dentro de cada producto: `domains/` y `helpers/`.
+- `sources/` queda al mismo nivel de las carpetas de producto para centralizar acceso a datos.
+- Esta misma organización se replica en `law_functions_body_only/`.
+
+### Flujo general de ejecución
+
+`Grafana wrapper -> Domain -> Helper(s) -> Source(s) -> Workspace table`
+
+- **Wrapper**: selecciona 1 domain function.
+- **Domain**: define estado final (normalmente color rojo/verde).
+- **Helper**: aplica reglas de negocio (lag, errores, ventanas, umbrales).
+- **Source**: estandariza lectura de tablas del workspace.
 
 ---
 
-## 2.1 Convención de nombres (obligatoria)
+## 2) Categorías de funciones
 
-- `sources`: `fn_src_mlp_*` (agregadores) y `fn_src_mlp_ws_*` (workspace-level).
-- `helpers`: `fn_prd_mlp_<faena>_*`.
-- `domains`: `fn_prd_mlp_<faena>_dom_*`.
+## 2.1 Domains (`fn_prd_mlp_*_dom_*`)
+Funciones de “estado final” consumidas desde Grafana.
 
-Si ves archivos como `fn_src_ada_*`, `fn_src_pipeline_runs_all` o `fn_src_systemlogs_all` sin `mlp`, corresponden a versión antigua y no deben existir en la rama actual.
+## 2.2 Helpers (`fn_prd_mlp_*_*`)
+Funciones de evaluación de reglas: alertas, desactualización, fallas consecutivas, etc.
 
-## 3) Catálogo funcional (estado actual)
+## 2.3 Sources (`fn_src_mlp_*` y `fn_src_mlp_ws_*`)
+Funciones de acceso a logs/pipelines.
 
-> Este catálogo incluye **solo funciones activas** (referenciadas por wrappers o por el grafo de dependencias de esas funciones).
+- `fn_src_mlp_ws_*`: acceso directo por workspace/tablas concretas.
+- `fn_src_mlp_*` (agregadoras): cuando un dominio combina múltiples fuentes.
 
-## 3.1 Sources (activas)
+## 2.4 Cross product
+Funciones compartidas entre productos:
 
-### Workspace-level (`fn_src_mlp_ws_*`)
-- `fn_src_mlp_ws_ada_table(tableName:string, startTime:datetime, endTime:datetime)`
-- `fn_src_mlp_ws_ada_systemlogs(startTime:datetime, endTime:datetime)`
-- `fn_src_mlp_ws_ada_consolelogs(startTime:datetime, endTime:datetime)`
-- `fn_src_mlp_ws_dispatch_pipelineruns(startTime:datetime, endTime:datetime)`
-- `fn_src_mlp_ws_drillit_pipelineruns(startTime:datetime, endTime:datetime)`
-- `fn_src_mlp_ws_blkgrde_pipelineruns(startTime:datetime, endTime:datetime)`
-- `fn_src_mlp_ws_meteo_systemlogs(startTime:datetime, endTime:datetime)`
-- `fn_src_mlp_ws_plans_systemlogs(startTime:datetime, endTime:datetime)`
-- `fn_src_mlp_ws_pisystem_table(tableName:string, startTime:datetime, endTime:datetime)`
-- `fn_src_mlp_ws_pisystem_systemlogs(startTime:datetime, endTime:datetime)`
-- `fn_src_mlp_ws_pisystem_consolelogs(startTime:datetime, endTime:datetime)`
-- `fn_src_mlp_ws_ssag_table(tableName:string, startTime:datetime, endTime:datetime)`
-- `fn_src_mlp_ws_ssag_systemlogs(startTime:datetime, endTime:datetime)`
-- `fn_src_mlp_ws_ssag_consolelogs(startTime:datetime, endTime:datetime)`
-- `fn_src_mlp_ws_pdmsagi_systemlogs(startTime:datetime, endTime:datetime)`
-- `fn_src_mlp_ws_notpii_databricksjobs_dev(startTime:datetime, endTime:datetime)`
-- `fn_src_mlp_ws_notpii_databricksjobs_uat(startTime:datetime, endTime:datetime)`
+- `fn_mon_status_to_color`
+- `fn_mon_global_from_color_set`
 
-### Product/faena-level (`fn_src_mlp_*`)
-- `fn_src_mlp_pipeline_runs_all(startTime:datetime, endTime:datetime)`
-- `fn_src_mlp_systemlogs_all(startTime:datetime, endTime:datetime)`
-- `fn_src_mlp_ada_consolelogs(startTime:datetime, endTime:datetime)`
-- `fn_src_mlp_ssag_systemlogs_all(startTime:datetime, endTime:datetime)`
-- `fn_src_mlp_ssag_consolelogs_all(startTime:datetime, endTime:datetime)`
-- `fn_src_mlp_notpii_pisystem_systemlogs(startTime:datetime, endTime:datetime)`
-- `fn_src_mlp_notpii_pisystem_consolelogs(startTime:datetime, endTime:datetime)`
-- `fn_src_mlp_notpii_databricksjobs_all(startTime:datetime, endTime:datetime)`
+---
 
-## 3.2 Helpers activos
+## 3) ADA — funciones y propósito
 
-### Cross-product
-- `fn_mon_status_to_color(status:string)`
-- `fn_mon_global_from_color_set(colors:dynamic, alert_color:string="#E53935", ok_color:string="#EAF4EA")`
+## 3.1 Domains ADA
+- `fn_prd_mlp_ada_dom_dispatch_status`: estado de Dispatch.
+- `fn_prd_mlp_ada_dom_drillit_status`: estado de Drillit.
+- `fn_prd_mlp_ada_dom_blockgrade_status`: estado de Blockgrade.
+- `fn_prd_mlp_ada_dom_pi_status`: estado de PI.
+- `fn_prd_mlp_ada_dom_plans_status`: estado de Plans.
+- `fn_prd_mlp_ada_dom_meteodata_status`: estado de Meteodata.
+- `fn_prd_mlp_ada_dom_alarm_status`: estado de Alarm.
+- `fn_prd_mlp_ada_dom_front_status`: estado de Front.
+- `fn_prd_mlp_ada_dom_kpi_status`: estado de KPI.
+- `fn_prd_mlp_ada_dom_global_status`: consolidado global ADA.
+
+## 3.2 Helpers ADA
+- `fn_prd_mlp_ada_alert_from_tables_lag`: evalúa lag por tabla según umbrales dinámicos.
+- `fn_prd_mlp_ada_alert_from_dispatch_nrt_logs`: evalúa alertas NRT desde logs de job17.
+- `fn_prd_mlp_ada_kpi_alert_rows`: detecta KPIs con errores persistentes y aplica excepciones por horario/mantención.
+
+## 3.3 Sources ADA
+- Base genérica: `fn_src_mlp_ws_ada(tableName, startTime, endTime)`.
+- Relacionadas de pipeline/systemlogs:
+  - `fn_src_mlp_ws_dispatch(tableName, ...)`, `fn_src_mlp_ws_drillit(tableName, ...)`, `fn_src_mlp_ws_blkgrde(tableName, ...)`
+  - `fn_src_mlp_ws_meteo(tableName, ...)`, `fn_src_mlp_ws_plans(tableName, ...)`
+  - `fn_src_mlp_pipeline_runs_all`, `fn_src_mlp_systemlogs_all`
+
+Ejemplo:
+- `fn_src_mlp_ws_ada("ContainerAppSystemLogs_CL", startTime, endTime)`
+
+---
+
+## 4) NOTPII — funciones y propósito
+
+## 4.1 Domains NOTPII
+- `fn_prd_mlp_notpii_dom_autoloader_dev_status`
+- `fn_prd_mlp_notpii_dom_autoloader_uat_status`
+- `fn_prd_mlp_notpii_dom_ingesta_status`
+- `fn_prd_mlp_notpii_dom_global_status`
+
+## 4.2 Helpers NOTPII
+- `fn_prd_mlp_notpii_autoloader_alert`: evaluación de autoloader (dev/uat).
+- `fn_prd_mlp_notpii_ingesta_job04_alert`: evaluación de job04 PI System (errores/warnings/ejecución).
+
+## 4.3 Sources NOTPII
+- Base genérica PI System: `fn_src_mlp_ws_pisystem(tableName, startTime, endTime)`.
+- Base genérica Databricks por ambiente: `fn_src_mlp_ws_notpii_databricksjobs(env, startTime, endTime)` con `env = dev|uat|all`.
+- Agregador product-level: `fn_src_mlp_notpii_databricksjobs_all` (usa `env = all`).
+
+Ejemplos:
+- `fn_src_mlp_ws_pisystem("ContainerAppConsoleLogs_CL", startTime, endTime)`
+- `fn_src_mlp_ws_notpii_databricksjobs("all", startTime, endTime)`
+
+---
+
+## 5) SIROSAG — funciones y propósito
+
+## 5.1 Domain SIROSAG
+- `fn_prd_mlp_ssag_dom_resumen_status`: estado consolidado SIROSAG.
+
+## 5.2 Helpers SIROSAG
+- `fn_prd_mlp_ssag_eval_desactualizacion`: verifica si datos/logs están desactualizados.
+- `fn_prd_mlp_ssag_eval_desfase`: evalúa desfase de datos.
+- `fn_prd_mlp_ssag_eval_ejecucion`: evalúa ejecución esperada de jobs.
+
+## 5.3 Sources SIROSAG
+- Base genérica SSAG: `fn_src_mlp_ws_ssag(tableName, startTime, endTime)`.
+- Fuentes relacionadas usadas por agregación:
+  - `fn_src_mlp_ws_pdmsagi(tableName, ...)`, `fn_src_mlp_ws_plans(tableName, ...)`, `fn_src_mlp_ws_pisystem(tableName, ...)`
+  - `fn_src_mlp_ssag_systemlogs_all`
+
+Ejemplo:
+- `fn_src_mlp_ws_ssag("ContainerAppSystemLogs_CL", startTime, endTime)`
+
+---
+
+## 6) Wrappers activos de Grafana (entrypoint)
 
 ### ADA
-- `fn_prd_mlp_ada_alert_from_tables_lag(tables:dynamic, startTime:datetime, endTime:datetime)`
-- `fn_prd_mlp_ada_alert_from_dispatch_nrt_logs(startTime:datetime, endTime:datetime)`
-- `fn_prd_mlp_ada_kpi_alert_rows(startTime:datetime, endTime:datetime)`
+- `var_mlp_ada_global`
+- `var_mlp_ada_dispatch`
+- `var_mlp_ada_drillit`
+- `var_mlp_ada_pi`
+- `var_mlp_ada_plans`
+- `var_mlp_ada_blockgrade`
+- `var_mlp_ada_meteodata`
+- `var_mlp_ada_kpi`
+- `var_mlp_ada_alarm`
+- `var_mlp_ada_front`
 
 ### NOTPII
-- `fn_prd_mlp_notpii_autoloader_alert(startTime:datetime, endTime:datetime, env:string)`
-- `fn_prd_mlp_notpii_ingesta_job04_alert(startTime:datetime, endTime:datetime)`
+- `var_mlp_notpii_autoloader_dev`
+- `var_mlp_notpii_autoloader_uat`
+- `var_mlp_notpii_ingesta`
+- `var_mlp_notpii_difusion_global`
 
 ### SIROSAG
-- `fn_prd_mlp_ssag_eval_desactualizacion(lastUtc:datetime, maxMin:int)`
-- `fn_prd_mlp_ssag_eval_desfase(lastUtc:datetime, maxMin:int)`
-- `fn_prd_mlp_ssag_eval_ejecucion(startTime:datetime, endTime:datetime, jobNames:dynamic, minSuccess:int)`
-
-## 3.3 Domain functions activas
-
-### ADA
-- `fn_prd_mlp_ada_dom_dispatch_status(startTime:datetime, endTime:datetime)`
-- `fn_prd_mlp_ada_dom_drillit_status(startTime:datetime, endTime:datetime)`
-- `fn_prd_mlp_ada_dom_blockgrade_status(startTime:datetime, endTime:datetime)`
-- `fn_prd_mlp_ada_dom_pi_status(startTime:datetime, endTime:datetime)`
-- `fn_prd_mlp_ada_dom_plans_status(startTime:datetime, endTime:datetime)`
-- `fn_prd_mlp_ada_dom_meteodata_status(startTime:datetime, endTime:datetime)`
-- `fn_prd_mlp_ada_dom_alarm_status(startTime:datetime, endTime:datetime)`
-- `fn_prd_mlp_ada_dom_front_status(startTime:datetime, endTime:datetime)`
-- `fn_prd_mlp_ada_dom_kpi_status(startTime:datetime, endTime:datetime)`
-- `fn_prd_mlp_ada_dom_global_status(startTime:datetime, endTime:datetime)`
-
-### NOTPII
-- `fn_prd_mlp_notpii_dom_autoloader_dev_status(startTime:datetime, endTime:datetime)`
-- `fn_prd_mlp_notpii_dom_autoloader_uat_status(startTime:datetime, endTime:datetime)`
-- `fn_prd_mlp_notpii_dom_ingesta_status(startTime:datetime, endTime:datetime)`
-- `fn_prd_mlp_notpii_dom_global_status(startTime:datetime, endTime:datetime)`
-
-### SIROSAG
-- `fn_prd_mlp_ssag_dom_resumen_status(startTime:datetime, endTime:datetime)`
-
-## 3.4 Wrappers activos (Grafana)
-
-- ADA: `var_mlp_ada_global`, `var_mlp_ada_dispatch`, `var_mlp_ada_drillit`, `var_mlp_ada_pi`, `var_mlp_ada_plans`, `var_mlp_ada_blockgrade`, `var_mlp_ada_meteodata`, `var_mlp_ada_kpi`, `var_mlp_ada_alarm`, `var_mlp_ada_front`.
-- NOTPII: `var_mlp_notpii_autoloader_dev`, `var_mlp_notpii_autoloader_uat`, `var_mlp_notpii_ingesta`, `var_mlp_notpii_difusion_global`.
-- SIROSAG: `var_mlp_sirosag_resumen`.
+- `var_mlp_sirosag_resumen`
 
 ---
 
+## 7) Limpieza aplicada (funciones retiradas)
 
-## 3.5 ¿Por qué Domain -> Source product/faena-level y no Domain -> Workspace-level directo?
+Se eliminaron archivos legacy/no utilizados (aliases o variantes antiguas) para evitar ruido y referencias obsoletas.  
+El paquete ahora pasa la auditoría local:
 
-Flujo real de dependencias (de arriba hacia abajo):
-
-`Grafana wrapper -> Domain -> (Helpers) -> Source product/faena-level -> Source workspace-level`
-
-> **Importante:** las funciones `workspace-level` **no** llaman a `product/faena-level`; ocurre al revés.
-
-### Razón de diseño
-1. **Contrato estable para dominios:**
-   los domains consumen una interfaz corta y estable (`fn_src_mlp_systemlogs_all`, `fn_src_mlp_pipeline_runs_all`, etc.) sin acoplarse a qué workspaces participan hoy.
-2. **Un solo punto de cambio:**
-   si cambia un workspace/RG/subscription, se actualiza en `ws_*` o en el agregador, sin tocar todos los domains.
-3. **Menos duplicación entre domains:**
-   varios domains comparten la misma base agregada; ir directo a `ws_*` multiplicaría lógica repetida.
-4. **Testing/validación más simple:**
-   se puede validar capa por capa (ws -> agregador -> domain).
-
-### Cuándo sí conviene Domain -> Workspace-level directo
-- Cuando un domain usa **una sola fuente exclusiva** y no se comparte con otros domains.
-- Cuando quieres optimización extrema y aceptas mayor acoplamiento al workspace.
-
-En este paquete, se usa patrón mixto: por defecto domains consumen `product/faena-level`; los `ws_*` quedan como capa de infraestructura reutilizable.
-
-## 4) Qué problemas resolvió este refactor
-
-## 4.1 Ruido de alertas por mantención
-
-Problema: durante mantención de chancadores se levantaban alertas que no representaban incidentes reales.
-
-Solución aplicada:
-- Detección `en_mantencion` vía `DISPATCH_CONDICION_OPERACIONAL` en `Logs_MLP_ADA_CL`.
-- Supresión de alertas en dominios sensibles (KPI y Blockgrade) cuando corresponde.
-
-Impacto:
-- Menos falsos positivos.
-- Mejor credibilidad del panel para operación.
-
-## 4.2 Dispatch sub-detectado en ventanas cortas
-
-Problema: con validación clásica de lag podían escaparse incidentes de ejecución rápida o degradaciones intermitentes.
-
-Solución aplicada:
-- `lag_classic` por tablas + `lag_nrt` por parsing de logs (`job17`) + validación de fallas consecutivas (`consec_fail_job17`).
-
-Impacto:
-- Mayor sensibilidad para detectar incidentes reales en Dispatch sin depender de un único indicador.
-
-## 4.3 Duplicación KPI entre estado y detalle
-
-Problema: reglas de KPI “sin datos/no esperado” estaban repetidas y podían divergir entre:
-- `fn_prd_mlp_ada_dom_kpi_status`
-
-Solución aplicada:
-- Centralización en helper único: `fn_prd_mlp_ada_kpi_alert_rows`.
-- Ambos dominios consumen la misma salida.
-
-Impacto:
-- Coherencia entre color y detalle visual.
-- Menor riesgo de drift funcional.
-
-## 4.4 Umbrales heterogéneos y faltantes
-
-Problema: mapa de umbrales de lag insuficiente para nuevas tablas o cadencias distintas.
-
-Solución aplicada:
-- Ampliación/ajuste de `mapUmbralAlerta` en helper de lag.
-
-Impacto:
-- Alertas más ajustadas al comportamiento real de cada dataset.
+```bash
+python refactor_ada_optimized/validate_kql_references.py
+# KQL package audit OK
+```
 
 ---
 
-## 5) Flujo lógico (resumen operativo)
+## 8) Reglas para cambios futuros
 
-1. **Sources** leen eventos base en la ventana `[startTime, endTime)`.
-2. **Helpers ADA** aplican reglas especializadas:
-   - lag por tabla,
-   - NRT logs dispatch,
-   - KPI rows alertables.
-3. **Domains** combinan señales por producto y devuelven `status`/`color`.
-4. **Global status** consolida todos los dominios y publica color global.
-5. **Grafana wrappers** consumen funciones de dominio para variables/chips.
+1. Si agregas un nuevo dominio, debe tener wrapper en `grafana_wrappers/`.
+2. Si agregas helper nuevo, preferir prefijo `fn_prd_mlp_*`.
+3. Evitar duplicados legacy (`fn_prd_*` o `fn_src_*` sin `mlp_`) salvo compatibilidad justificada.
+4. Mantener espejo en `law_functions_body_only/` cuando corresponda.
+5. Validar siempre con:
 
----
+```bash
+python refactor_ada_optimized/validate_kql_references.py
+```
 
-## 6) Reglas de diseño aplicadas
 
-- **Filtro temprano** por dominio (`ResourceGroup`, `JobName_s`, `ContainerJobName_s`, etc.).
-- **Funciones pequeñas por responsabilidad** (source/helper/domain).
-- **Paridad exacta** entre `law_functions/` y `law_functions_body_only/`.
-- **Formato de salida estable** para wrappers Grafana (color/status únicos).
+## 9) Refactor de Sources — mapping old -> new
 
----
+### 9.1 Base genérica por workspace
+- `fn_src_mlp_ws_ada(tableName, startTime, endTime)`
+- `fn_src_mlp_ws_pisystem(tableName, startTime, endTime)`
+- `fn_src_mlp_ws_ssag(tableName, startTime, endTime)`
+- `fn_src_mlp_ws_dispatch(tableName, startTime, endTime)`
+- `fn_src_mlp_ws_drillit(tableName, startTime, endTime)`
+- `fn_src_mlp_ws_blkgrde(tableName, startTime, endTime)`
+- `fn_src_mlp_ws_meteo(tableName, startTime, endTime)`
+- `fn_src_mlp_ws_plans(tableName, startTime, endTime)`
+- `fn_src_mlp_ws_pdmsagi(tableName, startTime, endTime)`
+- `fn_src_mlp_ws_notpii_databricksjobs(env, startTime, endTime)`
 
-## 7) Qué revisar cuando algo “se vea raro” en dashboard
+### 9.2 Estado de migración
+- Los consumidores internos (`domains`, `helpers`, `product-level sources`) ya consumen directamente la capa genérica por workspace.
+- Los wrappers legacy fueron retirados para dejar una base limpia y consistente.
 
-Checklist de diagnóstico rápido:
+### 9.3 Limitación técnica KQL y tradeoff
+- **Sí**, KQL permite pasar nombre de tabla como parámetro usando `workspace("...").table(tableName)`.
+- **Limitación**: no se puede parametrizar de forma directa el identificador de workspace de manera libre y segura en una sola función universal sin introducir complejidad/ambigüedad.
+- **Solución aplicada**: función genérica por workspace (ADA, PISYSTEM, SSAG, etc.) consumida directamente por domains/helpers/sources agregadas.
+- **Tradeoff**: se mantiene algo de superficie API, pero se reduce drásticamente duplicación y se centraliza la parte crítica (workspace + filtro temporal).
 
-1. ¿El dominio está en `ALERT` por jobs caídos o por lag?
-2. ¿Hay mantención activa (`en_mantencion`) que deba suprimir parte del ruido?
-3. ¿El helper de KPI está devolviendo filas (`fn_prd_mlp_ada_kpi_alert_rows`)?
-4. ¿El umbral de la tabla existe y es correcto en `mapUmbralAlerta`?
-5. ¿El wrapper de Grafana está leyendo el campo esperado (`color` o `detalle_html`)?
-6. ¿La versión en `body_only` está alineada con la versión completa?
-
----
-
-## 8) Próximos pasos recomendados (roadmap)
-
-## 8.1 Corto plazo (alto impacto / bajo riesgo)
-
-1. **Externalizar configuración de exclusiones KPI por condición horaria**
-   - Pasar de `iff` encadenados a configuración declarativa (diccionario/tabla de reglas).
-   - Beneficio: mantenimiento rápido sin tocar lógica principal.
-
-2. **Normalizar detección de mantención en helper común**
-   - Evitar repetir `en_mantencion` en múltiples dominios.
-
-3. **Suite mínima de validación manual estandarizada**
-   - Queries de smoke test por dominio y helper.
-   - Checklist de regresión por release.
-
-## 8.2 Mediano plazo
-
-4. ~~Source helper parametrizable por workspace resource id~~ (descartado por limitación práctica de `workspace()` dinámico en KQL); se adopta capa `fn_src_mlp_ws_*` + sources agregados por faena
-   - Crear helper base + wrappers por dominio (enfoque híbrido).
-   - Beneficio: menos hardcode y mejor portabilidad entre entornos.
-
-5. **Tabla de configuración externa para umbrales y exclusiones**
-   - Umbrales lag, ventanas horarias KPI, flags de supresión.
-   - Beneficio: gobernanza y trazabilidad de cambios sin editar KQL central.
-
-6. **Telemetría de calidad de reglas**
-   - Métricas de falsos positivos / tiempo en alerta / dominios más ruidosos.
-
-## 8.3 Largo plazo
-
-7. **Versionado formal de reglas de monitoreo**
-   - Cambios con vigencia (`valid_from`, `valid_to`) y rollback sencillo.
-
-8. **Automatización CI para sincronía full/body-only**
-   - Verificación automática de paridad funcional entre carpetas espejo.
-
----
-
-## 9) Guía de actualización segura
-
-Cuando se modifique una función:
-
-1. Cambiar primero en `law_functions/...`.
-2. Replicar en `law_functions_body_only/...`.
-3. Validar sintaxis (`git diff --check`) y consistencia de nombres/salidas.
-4. Revisar consumo en wrappers Grafana.
-5. Documentar en este README: objetivo, impacto y riesgos.
-
----
-
-## 10) Notas de operación
-
-- Los colores esperados de salida son consistentes con el dashboard actual:
-  - `ALERT` → rojo (`#E53935`)
-  - `OK` → verde claro (`#EAF4EA`)
-- Ventanas temporales y timezone se manejan con foco en operación Chile (`America/Santiago`) cuando aplica.
-- Mantener funciones de dominio acotadas: evitar mover lógica pesada al wrapper de Grafana.
-
----
-
-## 11) Estado de documentación
-
-Este README representa el estado actual del refactor ADA en la rama de trabajo, incluyendo:
-
-- arquitectura por capas,
-- catálogo funcional vigente,
-- problemas ya resueltos,
-- criterios operacionales,
-- y plan de evolución recomendado.
-
----
-
-## 12) Extensión SIROSAG MLP (panel Resumen)
-
-Se incorporó la migración del bloque de consulta embebido en JSON a funciones LAW + wrapper para el resumen SIROSAG:
-
-### Sources SIROSAG
-- `fn_src_mlp_ssag_systemlogs_all(startTime:datetime, endTime:datetime)`
-- `fn_src_mlp_ssag_consolelogs_all(startTime:datetime, endTime:datetime)`
-
-### Helpers SIROSAG
-- `fn_prd_mlp_ssag_eval_ejecucion(job_name:string, endTime:datetime, ventana_min:int, max_fallas:int, operador:string)`
-- `fn_prd_mlp_ssag_eval_desfase(job_name:string, endTime:datetime, ventana_min:int, max_minutos:int)`
-- `fn_prd_mlp_ssag_eval_desactualizacion(job_name:string, endTime:datetime, ventana_min:int, log_prefix:string, ts_offset:int, ts_length:int, max_minutos:int)`
-
-### Dominio SIROSAG
-- `fn_prd_mlp_ssag_dom_resumen_status(startTime:datetime, endTime:datetime)`
-
-### Wrapper Grafana
-- `grafana_wrappers/var_mlp_sirosag_resumen.kql`
-
-### Resultado funcional
-La función de dominio devuelve directamente las columnas de negocio del panel:
-- `Ingesta_PI`
-- `Ingesta_PDM_Sag`
-- `Ingesta_Planes`
-- `Salud_ITOT`
-- `Procesamiento_PI`
-- `Procesamiento_Restricciones`
-- `Celdas`
-- `Solidos`
-- `Front`
-- `Alarmas`
-
-Cada columna retorna `Alertar` / `No Alertar`, preservando la semántica del panel original.
-
----
-
-## 13) Extensión MLP NOT PII
-
-Se incorporó la migración de variables NOT PII del dashboard (`ingesta`, `autoloader_uat`, `autoloader_dev`, `difusion_global`) al modelo de funciones LAW + wrappers.
-
-### Sources NOT PII
-- `fn_src_mlp_notpii_databricksjobs_all(startTime:datetime, endTime:datetime)`
-- `fn_src_mlp_notpii_pisystem_systemlogs(startTime:datetime, endTime:datetime)`
-- `fn_src_mlp_notpii_pisystem_consolelogs(startTime:datetime, endTime:datetime)`
-
-### Helpers NOT PII
-- `fn_prd_mlp_notpii_ingesta_job04_alert(endTime:datetime)`
-- `fn_prd_mlp_notpii_autoloader_alert(jobs_config:dynamic, startTime:datetime, endTime:datetime, step:timespan = 15m)`
-
-### Domains NOT PII
-- `fn_prd_mlp_notpii_dom_ingesta_status(startTime:datetime, endTime:datetime)`
-- `fn_prd_mlp_notpii_dom_autoloader_uat_status(startTime:datetime, endTime:datetime)`
-- `fn_prd_mlp_notpii_dom_autoloader_dev_status(startTime:datetime, endTime:datetime)`
-- `fn_prd_mlp_notpii_dom_global_status(startTime:datetime, endTime:datetime)`
-
-### Wrappers Grafana NOT PII
-- `grafana_wrappers/var_mlp_notpii_ingesta.kql`
-- `grafana_wrappers/var_mlp_notpii_autoloader_uat.kql`
-- `grafana_wrappers/var_mlp_notpii_autoloader_dev.kql`
-- `grafana_wrappers/var_mlp_notpii_difusion_global.kql`
+### 9.4 Recomendación final
+- Para tablas de un workspace conocido: usar `fn_src_mlp_ws_<workspace>(tableName, startTime, endTime)`.
+- Para escenarios multi-entorno (NOTPII Databricks): usar función controlada por enum (`env = dev|uat|all`) en vez de string totalmente libre para workspace.

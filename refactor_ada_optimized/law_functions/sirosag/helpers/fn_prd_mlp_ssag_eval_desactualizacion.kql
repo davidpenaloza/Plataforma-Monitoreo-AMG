@@ -1,0 +1,13 @@
+let fn_prd_mlp_ssag_eval_desactualizacion = (job_name:string, endTime:datetime, ventana_min:int, log_prefix:string, ts_offset:int, ts_length:int, max_minutos:int) {
+    let startTime = endTime - totimespan(ventana_min * 60s);
+    let last_row =
+        fn_src_mlp_ws_ssag("ContainerAppConsoleLogs_CL", startTime, endTime)
+        | where ContainerJobName_s == job_name
+        | where Log_s startswith log_prefix
+        | top 1 by TimeGenerated desc
+        | project LastLogTimeGenerated = TimeGenerated, Log_s;
+    last_row
+    | extend ultimo_timestamp = todatetime(substring(Log_s, ts_offset, ts_length))
+    | extend diff_min = datetime_diff('minute', LastLogTimeGenerated, ultimo_timestamp)
+    | project Status = iff(isnull(LastLogTimeGenerated) or isnull(ultimo_timestamp) or diff_min > max_minutos, 'NOOK', 'OK')
+};

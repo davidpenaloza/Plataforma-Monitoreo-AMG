@@ -1,5 +1,0 @@
-let fn_src_mlp_ws_notpii_databricksjobs_uat = (startTime:datetime, endTime:datetime) {
-  workspace("/subscriptions/0d996eb2-802f-4ef8-8ae6-d385c74da7e6/resourceGroups/ams-uat-dataplatform-rg/providers/Microsoft.OperationalInsights/workspaces/ams-uat-dataplatform-laws").table("DatabricksJobs")
-  | where TimeGenerated between (startTime .. endTime)
-  | project TimeGenerated, RequestParams
-};
