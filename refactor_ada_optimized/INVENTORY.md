@@ -2,6 +2,17 @@
 
 Inventario derivado del grafo real: `wrappers -> domains -> helpers -> sources`.
 
+
+## 0) Organización de carpetas
+
+- `law_functions/ada/{domains,helpers}`
+- `law_functions/notpii/{domains,helpers}`
+- `law_functions/sirosag/{domains,helpers}`
+- `law_functions/cross_product/helpers`
+- `law_functions/sources` (mismo nivel que carpetas de productos)
+
+El mismo layout aplica para `law_functions_body_only/`.
+
 ## 1) Wrappers activos
 
 - ADA: `var_mlp_ada_global`, `var_mlp_ada_dispatch`, `var_mlp_ada_drillit`, `var_mlp_ada_pi`, `var_mlp_ada_plans`, `var_mlp_ada_blockgrade`, `var_mlp_ada_meteodata`, `var_mlp_ada_kpi`, `var_mlp_ada_alarm`, `var_mlp_ada_front`.
