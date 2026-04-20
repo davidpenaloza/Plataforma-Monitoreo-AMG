@@ -1,0 +1,4 @@
+let fn_src_mlp_ws_dispatch_pipelineruns = (startTime:datetime, endTime:datetime) {
+  fn_src_mlp_ws_dispatch("AzureDiagnostics", startTime, endTime)
+  | project TimeGenerated, Category, ResourceGroup, OperationName
+};

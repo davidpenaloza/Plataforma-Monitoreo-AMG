@@ -1,14 +1,60 @@
 # Plataforma Monitoreo AMG — Guía funcional (ADA, SIROSAG y NOTPII)
 
 Este README describe **cómo está organizado el paquete KQL**, qué hace cada categoría de funciones y cuáles son las funciones activas por producto.
+# Plataforma Monitoreo AMG — Guía funcional (ADA, SIROSAG y NOTPII)
+
+Este README describe **cómo está organizado el paquete KQL**, qué hace cada categoría de funciones y cuáles son las funciones activas por producto.
 
 ---
 
+## 1) Estructura del paquete
 ## 1) Estructura del paquete
 
 ```text
 refactor_ada_optimized/
 ├─ law_functions/
+│  ├─ ada/
+│  │  ├─ domains/             # Domains de ADA
+│  │  └─ helpers/             # Helpers de ADA
+│  ├─ notpii/
+│  │  ├─ domains/             # Domains de NOTPII
+│  │  └─ helpers/             # Helpers de NOTPII
+│  ├─ sirosag/
+│  │  ├─ domains/             # Domains de SIROSAG
+│  │  └─ helpers/             # Helpers de SIROSAG
+│  ├─ cross_product/
+│  │  └─ helpers/             # Utilidades compartidas
+│  └─ sources/                # Fuentes comunes (mismo nivel que carpetas de productos)
+├─ law_functions_body_only/   # Espejo por producto para pegar body en LAW UI
+└─ grafana_wrappers/          # Variables/paneles de Grafana (entrypoints)
+```
+
+
+### Convención de ubicación
+
+- Todo lo específico de producto vive bajo su carpeta (`ada/`, `notpii/`, `sirosag/`).
+- Dentro de cada producto: `domains/` y `helpers/`.
+- `sources/` queda al mismo nivel de las carpetas de producto para centralizar acceso a datos.
+- Esta misma organización se replica en `law_functions_body_only/`.
+
+### Flujo general de ejecución
+
+`Grafana wrapper -> Domain -> Helper(s) -> Source(s) -> Workspace table`
+
+- **Wrapper**: selecciona 1 domain function.
+- **Domain**: define estado final (normalmente color rojo/verde).
+- **Helper**: aplica reglas de negocio (lag, errores, ventanas, umbrales).
+- **Source**: estandariza lectura de tablas del workspace.
+
+---
+
+## 2) Categorías de funciones
+
+## 2.1 Domains (`fn_prd_mlp_*_dom_*`)
+Funciones de “estado final” consumidas desde Grafana.
+
+## 2.2 Helpers (`fn_prd_mlp_*_*`)
+Funciones de evaluación de reglas: alertas, desactualización, fallas consecutivas, etc.
 │  ├─ ada/
 │  │  ├─ domains/             # Domains de ADA
 │  │  └─ helpers/             # Helpers de ADA
