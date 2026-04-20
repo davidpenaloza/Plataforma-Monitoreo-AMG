@@ -1,4 +1,4 @@
   union
-    (fn_src_mlp_ws_dispatch_pipelineruns(startTime, endTime)),
-    (fn_src_mlp_ws_drillit_pipelineruns(startTime, endTime)),
-    (fn_src_mlp_ws_blkgrde_pipelineruns(startTime, endTime))
+    (fn_src_mlp_ws_dispatch("AzureDiagnostics", startTime, endTime) | project TimeGenerated, Category, ResourceGroup, OperationName),
+    (fn_src_mlp_ws_drillit("AzureDiagnostics", startTime, endTime) | project TimeGenerated, Category, ResourceGroup, OperationName),
+    (fn_src_mlp_ws_blkgrde("AzureDiagnostics", startTime, endTime) | project TimeGenerated, Category, ResourceGroup, OperationName)

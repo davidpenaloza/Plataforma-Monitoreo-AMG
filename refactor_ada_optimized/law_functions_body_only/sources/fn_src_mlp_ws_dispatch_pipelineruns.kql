@@ -1,2 +1,0 @@
-  fn_src_mlp_ws_dispatch("AzureDiagnostics", startTime, endTime)
-  | project TimeGenerated, Category, ResourceGroup, OperationName

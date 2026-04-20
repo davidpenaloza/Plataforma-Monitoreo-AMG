@@ -1,2 +1,7 @@
+<<<<<<<< HEAD:refactor_ada_optimized/law_functions_body_only/sources/fn_src_mlp_ws_blkgrde.kql
   workspace("/subscriptions/c68213bf-7453-4ba4-9aaa-56b822af4c20/resourceGroups/MLP-PRD-RG-BLKGRDE/providers/Microsoft.OperationalInsights/workspaces/mlp-prd-law-blkgrde").table(tableName)
   | where TimeGenerated between (startTime .. endTime)
+========
+  fn_src_mlp_ws_blkgrde("AzureDiagnostics", startTime, endTime)
+  | project TimeGenerated, Category, ResourceGroup, OperationName
+>>>>>>>> main:refactor_ada_optimized/law_functions_body_only/sources/fn_src_mlp_ws_blkgrde_pipelineruns.kql

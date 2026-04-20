@@ -1,2 +1,7 @@
+<<<<<<<< HEAD:refactor_ada_optimized/law_functions_body_only/sources/fn_src_mlp_ws_pdmsagi.kql
   workspace("/subscriptions/c68213bf-7453-4ba4-9aaa-56b822af4c20/resourceGroups/MLP-PRD-RG-PDMSAGI/providers/Microsoft.OperationalInsights/workspaces/mlp-prd-law-pdmsagi").table(tableName)
   | where TimeGenerated between (startTime .. endTime)
+========
+  fn_src_mlp_ws_pdmsagi("ContainerAppSystemLogs_CL", startTime, endTime)
+  | project TimeGenerated, JobName_s, Type_s, Reason_s, Log_s
+>>>>>>>> main:refactor_ada_optimized/law_functions_body_only/sources/fn_src_mlp_ws_pdmsagi_systemlogs.kql

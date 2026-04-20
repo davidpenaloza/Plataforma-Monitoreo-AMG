@@ -1,3 +1,0 @@
-let fn_src_mlp_ws_ssag_table = (tableName:string, startTime:datetime, endTime:datetime) {
-  fn_src_mlp_ws_ssag(tableName, startTime, endTime)
-};

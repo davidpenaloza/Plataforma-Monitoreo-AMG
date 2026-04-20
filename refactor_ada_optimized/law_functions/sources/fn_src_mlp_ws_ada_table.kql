@@ -1,3 +1,0 @@
-let fn_src_mlp_ws_ada_table = (tableName:string, startTime:datetime, endTime:datetime) {
-  fn_src_mlp_ws_ada(tableName, startTime, endTime)
-};

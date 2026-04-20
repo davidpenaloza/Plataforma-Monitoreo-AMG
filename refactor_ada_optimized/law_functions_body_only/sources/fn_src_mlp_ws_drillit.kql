@@ -1,2 +1,7 @@
+<<<<<<<< HEAD:refactor_ada_optimized/law_functions_body_only/sources/fn_src_mlp_ws_drillit.kql
   workspace("/subscriptions/c68213bf-7453-4ba4-9aaa-56b822af4c20/resourceGroups/MLP-PRD-RG-DRILLIT/providers/Microsoft.OperationalInsights/workspaces/mlp-prd-law-drillit").table(tableName)
   | where TimeGenerated between (startTime .. endTime)
+========
+  fn_src_mlp_ws_drillit("AzureDiagnostics", startTime, endTime)
+  | project TimeGenerated, Category, ResourceGroup, OperationName
+>>>>>>>> main:refactor_ada_optimized/law_functions_body_only/sources/fn_src_mlp_ws_drillit_pipelineruns.kql

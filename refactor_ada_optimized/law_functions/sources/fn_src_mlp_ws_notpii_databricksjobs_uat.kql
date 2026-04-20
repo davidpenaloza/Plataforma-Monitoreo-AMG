@@ -1,3 +1,0 @@
-let fn_src_mlp_ws_notpii_databricksjobs_uat = (startTime:datetime, endTime:datetime) {
-  fn_src_mlp_ws_notpii_databricksjobs("uat", startTime, endTime)
-};

@@ -1,5 +1,5 @@
   union
-    (fn_src_mlp_ws_ssag_systemlogs(startTime, endTime)),
-    (fn_src_mlp_ws_plans_systemlogs(startTime, endTime)),
-    (fn_src_mlp_ws_pdmsagi_systemlogs(startTime, endTime)),
-    (fn_src_mlp_ws_pisystem_systemlogs(startTime, endTime))
+    (fn_src_mlp_ws_ssag("ContainerAppSystemLogs_CL", startTime, endTime)),
+    (fn_src_mlp_ws_plans("ContainerAppSystemLogs_CL", startTime, endTime)),
+    (fn_src_mlp_ws_pdmsagi("ContainerAppSystemLogs_CL", startTime, endTime)),
+    (fn_src_mlp_ws_pisystem("ContainerAppSystemLogs_CL", startTime, endTime))
