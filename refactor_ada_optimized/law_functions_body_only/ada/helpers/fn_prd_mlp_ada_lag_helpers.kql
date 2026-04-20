@@ -1,0 +1,57 @@
+  let mapUmbralAlerta = dynamic({
+      "pisystem_interpolated": 20,
+      "dispatch_tiempos": 70,
+      "dispatch_shiftdumps": 70,
+      "dispatch_shiftloads": 70,
+      "dispatch_shiftloads2": 70,
+      "dispatch_shiftstate": 70,
+      "StdShiftLoads2": 10,
+      "stdshiftdumpsnodicavel": 10,
+      "StdShiftDumps": 10,
+      "StdShiftLoads": 10,
+      "tiempos_mlp": 10,
+      "StdShiftState": 10,
+      "ShiftInfo": 10,
+      "SHIFTShiftLoad": 10,
+      "StdGrade": 10,
+      "drillit_drillings": 600,
+      "drillit_drill_state_history": 600,
+      "meteodata": 180,
+      "blockgrade_bybucket": 90,
+      "planes_semanales_AXB": 1440,
+      "planes_semanales_PLANTA_CONCENTRADORA_RECUPERACION_CU": 1440,
+      "planes_semanales_LEY_CONCENTRADO_CU": 1440,
+      "planes_semanales_TRANSPORTADO_STMG":1440,
+      "planes_semanales_CONCENTRADO_PRODUCIDO":1440,
+      "planes_semanales_PLANTA_CONCENTRADORA_LEY_CU":1440,
+      "planes_semanales_PLANTA_CONCENTRADORA_CU_FINO_PRODUCIDO":1440,
+      "planes_semanales_PLANTA_CONCENTRADORA_MO_FINO_PRODUCIDO":1440,
+      "planes_semanales_PLANTA_CONCENTRADORA_TRATAMIENTO":1440,
+      "planes_semanales_PUERTO_CU_FINO_FILTRADO_PAGABLE":1440,
+      "planes_acc_mensuales_TRANSPORTADO_STMG":2100,
+      "planes_acc_mensuales_CONCENTRADO_PRODUCIDO":2100,
+      "planes_acc_mensuales_PLANTA_CONCENTRADORA_LEY_CU":2100,
+      "planes_acc_mensuales_LEY_CONCENTRADO_CU":2100,
+      "planes_acc_mensuales_PUERTO_CU_FINO_FILTRADO_PAGABLE":2100,
+      "planes_acc_mensuales_PLANTA_CONCENTRADORA_TRATAMIENTO":2100,
+      "planes_acc_mensuales_EXTRACCION_MINA":2100,
+      "planes_acc_mensuales_PLANTA_CONCENTRADORA_CU_FINO_PRODUCIDO":2100,
+      "planes_acc_mensuales_PLANTA_CONCENTRADORA_MO_FINO_PRODUCIDO":2100,
+      "planes_acc_mensuales_PLANTA_CONCENTRADORA_RECUPERACION_CU":2100
+  });
+  let t = fn_src_mlp_ws_ada_consolelogs(startTime, endTime)
+      | where TimeGenerated between (startTime .. endTime)
+      | where ContainerGroupName_s startswith "mlp-prd-caj-ada-job02" // filtro temprano por dominio
+      | where Log_s startswith '{"fecha'
+      | project parsed = parse_json(Log_s)
+      | project mensaje=tostring(parsed.mensaje), fecha_log_UTC=todatetime(parsed.fecha_log_UTC)
+      | where mensaje startswith "timestamp_"
+      | extend tabla = replace_string(replace_string(substring(mensaje, 10, indexof(mensaje, ": ") - 10), "last_record_", ""), "last_reg_", "")
+      | where tabla in (tables)
+      | extend ultimo_timestamp = todatetime(substring(mensaje, indexof(mensaje, ": ") + 2, 19))
+      | extend ultimo_timestamp = datetime_local_to_utc(ultimo_timestamp, "America/Santiago")
+      | extend diff_minutos = round(datetime_diff("second", fecha_log_UTC, ultimo_timestamp) / 60.0, 1)
+      | extend umbral=todouble(mapUmbralAlerta[tabla])
+      | extend alert=iff(isempty(diff_minutos) or diff_minutos > umbral, 1, 0)
+      | summarize has_alert=max(alert);
+  iff(toscalar(t) == 1, "ALERT", "OK")

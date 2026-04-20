@@ -1,3 +1,2 @@
-  workspace("/subscriptions/c68213bf-7453-4ba4-9aaa-56b822af4c20/resourceGroups/MLP-PRD-RG-BLKGRDE/providers/Microsoft.OperationalInsights/workspaces/mlp-prd-law-blkgrde").table("AzureDiagnostics")
-  | where TimeGenerated between (startTime .. endTime)
+  fn_src_mlp_ws_blkgrde("AzureDiagnostics", startTime, endTime)
   | project TimeGenerated, Category, ResourceGroup, OperationName

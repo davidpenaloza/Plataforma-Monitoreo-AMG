@@ -1,0 +1,34 @@
+let fn_prd_mlp_notpii_ingesta_job04_alert = (endTime:datetime) {
+    let base =
+        union
+        (
+            fn_src_mlp_ws_pisystem_systemlogs(endTime - 20m, endTime)
+            | where JobName_s == "mlp-prd-caj-pisystem-job04"
+            | project ejecucion = bin(TimeGenerated, 5m), nombreReal = "mlp-prd-caj-pisystem-job04_ejecucion", status = "n"
+        ),
+        (
+            fn_src_mlp_ws_pisystem_consolelogs(endTime - 20m, endTime)
+            | where ContainerJobName_s == "mlp-prd-caj-pisystem-job04"
+            | where Log_s contains "ERROR"
+            | project ejecucion = bin(TimeGenerated, 5m), nombreReal = "mlp-prd-caj-pisystem-job04_logs", status = "e"
+        ),
+        (
+            fn_src_mlp_ws_pisystem_consolelogs(endTime - 20m, endTime)
+            | where ContainerJobName_s == "mlp-prd-caj-pisystem-job04"
+            | where Log_s contains "WARNING"
+            | project ejecucion = bin(TimeGenerated, 5m), nombreReal = "mlp-prd-caj-pisystem-job04_logs", status = "w"
+        );
+    let por_ejecucion =
+        base
+        | summarize status = case(countif(status == "e") > 0, "e", countif(status == "w") > 0, "w", "n") by nombreReal, ejecucion;
+    let ultimas_3 =
+        por_ejecucion
+        | partition hint.strategy=native by nombreReal (
+            sort by ejecucion desc
+            | take 3
+        );
+    ultimas_3
+    | summarize fallas = countif(status == "e"), warnings = countif(status == "w")
+    | extend Estado = iff(fallas >= 2 or warnings >= 3, "Alertar", "No Alertar")
+    | project Estado
+};

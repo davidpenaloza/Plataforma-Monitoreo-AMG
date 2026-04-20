@@ -1,6 +1,0 @@
-let fn_prd_mlp_notpii_dom_difusion_global_status = (startTime:datetime, endTime:datetime) {
-  let estado_uat = iff(toscalar(fn_prd_mlp_notpii_dom_autoloader_uat_status(startTime, endTime) | project color) == "#E53935", "Alertar", "No Alertar");
-  let estado_dev = iff(toscalar(fn_prd_mlp_notpii_dom_autoloader_dev_status(startTime, endTime) | project color) == "#E53935", "Alertar", "No Alertar");
-  let hay_alertas = iff(estado_uat == "Alertar" or estado_dev == "Alertar", 1, 0);
-  print color = iff(hay_alertas == 1, "#E53935", "#EAF4EA")
-};

@@ -1,0 +1,4 @@
+let fn_src_mlp_ws_ada = (tableName:string, startTime:datetime, endTime:datetime) {
+  workspace("/subscriptions/c68213bf-7453-4ba4-9aaa-56b822af4c20/resourceGroups/MLP-PRD-RG-ADA/providers/Microsoft.OperationalInsights/workspaces/mlp-prd-law-ada").table(tableName)
+  | where TimeGenerated between (startTime .. endTime)
+};

@@ -1,0 +1,14 @@
+let fn_src_mlp_ws_notpii_databricksjobs = (env:string, startTime:datetime, endTime:datetime) {
+  let env_norm = tolower(trim(" ", env));
+  union
+    (
+      workspace("/subscriptions/0d996eb2-802f-4ef8-8ae6-d385c74da7e6/resourceGroups/ams-dev-dataplatform-rg/providers/Microsoft.OperationalInsights/workspaces/ams-dev-dataplatform-laws").table("DatabricksJobs")
+      | where env_norm in ("dev", "all")
+    ),
+    (
+      workspace("/subscriptions/0d996eb2-802f-4ef8-8ae6-d385c74da7e6/resourceGroups/ams-uat-dataplatform-rg/providers/Microsoft.OperationalInsights/workspaces/ams-uat-dataplatform-laws").table("DatabricksJobs")
+      | where env_norm in ("uat", "all")
+    )
+  | where TimeGenerated between (startTime .. endTime)
+  | project TimeGenerated, RequestParams
+};

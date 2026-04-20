@@ -106,7 +106,7 @@ for path in wrapper_files:
             errors.append(f"Wrapper {path.name} points to non-domain function: {fn}")
 
 # Ensure global depends only on domain functions + cross helper
-global_file = ROOT / "law_functions/domains/fn_prd_mlp_ada_dom_global_status.kql"
+global_file = ROOT / "law_functions/ada/domains/fn_prd_mlp_ada_dom_global_status.kql"
 if global_file.exists():
     text = global_file.read_text(encoding="utf-8")
     calls = sorted(set(CALL_RE.findall(text)))
