@@ -1,4 +1,4 @@
-let fn_prd_mlp_ada_dom_plans_status = (startTime:datetime, endTime:datetime) {
+let fn_prd_mlp_ada_amg_dom_plans_status = (startTime:datetime, endTime:datetime) {
   let job_ok = toscalar(
     fn_src_mlp_systemlogs_all(startTime - 25m, endTime)
     | where JobName_s == "mlp-prd-caj-plans-job01" // filtro temprano por dominio
