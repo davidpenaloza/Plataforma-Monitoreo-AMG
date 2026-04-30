@@ -46,19 +46,6 @@ let fn_prd_mlp_ada_dom_alarm_status = (startTime:datetime, endTime:datetime) {
     | where Log_s contains "[ERROR] Conection error with storage data"
     | count
   );
-  //Se comenta porque es una regla que se ocupa en el dashboard de ADA PRD , más no en el dashboard de AMG
-  //let errores = toscalar(
-  //    source_ada_consolelogs_legacy(endTime - 1d, endTime)
-  //    | where TimeGenerated >= endTime - 1d and TimeGenerated < endTime
-  //    | where ContainerJobName_s startswith 'mlp-prd-caj-ada-job07' // filtro temprano por dominio
-  //    | where Log_s startswith '{"fecha_log_UTC":'
-  //    | extend ParsedJson = parse_json(Log_s)
-  //    | evaluate bag_unpack(ParsedJson)
-  //    | where log_nivel == "ERROR" and log_capa == "domain-alarm"
-  //    | count
-  //    );
-  //let status = iff(not(job06_ok) or not(job07_ok) or errores > 177, "ALERT", "OK");
   let status = iff(not(job06_ok) or not(job07_ok) or adaJobsAlarmAlert or incidentes_largos_alarmas > 0 or error_conexion_storage > 0, "ALERT", "OK");
-
   print color = fn_mon_status_to_color(status)
 };

@@ -1,0 +1,22 @@
+let fn_prd_mlp_ada_amg_dom_alarm_status = (startTime:datetime, endTime:datetime) {
+  let job06_ok = toscalar(
+    fn_src_mlp_systemlogs_all(startTime - 35m, endTime)
+    | where JobName_s == "mlp-prd-caj-ada-job06"
+    | where Log_s contains "has successfully completed"
+    | count
+    ) > 0;
+  let job07_ok = toscalar(
+    fn_src_mlp_systemlogs_all(startTime - 10m, endTime)
+    | where JobName_s == "mlp-prd-caj-ada-job07"
+    | where Log_s contains "has successfully completed"
+    | count
+    ) > 0;
+  let adaJobsAlarmAlert = toscalar(
+    fn_prd_mlp_ada_jobs_status_detail(startTime, endTime)
+    | where domain == "Alarmas"
+    | summarize alertCount = countif(isAlert == true)
+    | project alertCount > 0
+  );
+  let status = iff(not(job06_ok) or not(job07_ok) or adaJobsAlarmAlert, "ALERT", "OK");
+  print color = fn_mon_status_to_color(status)
+};
