@@ -2,14 +2,14 @@ let fn_prd_mlp_ada_dom_settings_status = (startTime:datetime, endTime:datetime) 
   let threshold_job01_minutes = 60.0;
   let threshold_job02_minutes = 120.0;
   let job01_last_success = toscalar(
-    fn_src_mlp_ws_ada("ContainerAppSystemLogs_CL", startTime - 4h, endTime)
+    fn_src_mlp_ws_prfci("ContainerAppSystemLogs_CL", startTime - 4h, endTime)
     | where TimeGenerated >= startTime - 4h and TimeGenerated < endTime
     | where JobName_s == "mlp-prd-caj-prfci-job01"
     | where Log_s contains "has successfully completed"
     | summarize max(TimeGenerated)
   );
   let job02_last_success = toscalar(
-    fn_src_mlp_ws_ada("ContainerAppSystemLogs_CL", startTime - 4h, endTime)
+    fn_src_mlp_ws_prfci("ContainerAppSystemLogs_CL", startTime - 4h, endTime)
     | where TimeGenerated >= startTime - 4h and TimeGenerated < endTime
     | where JobName_s == "mlp-prd-caj-prfci-job02"
     | where Log_s contains "has successfully completed"

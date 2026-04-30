@@ -9,7 +9,7 @@ let fn_prd_mlp_ada_dom_optimizador_status = (startTime:datetime, endTime:datetim
     | count
   ) > 0;
   let optimizador_job01_ok = toscalar(
-    fn_src_mlp_ws_ada("ContainerAppSystemLogs_CL", endTime - 24h, endTime)
+    fn_src_mlp_ws_genshare("ContainerAppSystemLogs_CL", endTime - 24h, endTime)
     | where TimeGenerated >= endTime - 24h and TimeGenerated < endTime
     | where JobName_s == "ams-prd-caj-genshare-job01"
     | where Log_s contains "has successfully completed"
