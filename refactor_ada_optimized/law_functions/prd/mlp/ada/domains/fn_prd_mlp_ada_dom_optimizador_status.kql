@@ -5,7 +5,8 @@ let fn_prd_mlp_ada_dom_optimizador_status = (startTime:datetime, endTime:datetim
     | mv-expand json_RequestParams
     | extend jobId = tostring(json_RequestParams.jobId)
     | where jobId == "1101447596243116"
-    | where ActionName == "runFailed"
+    | extend action_name = tostring(column_ifexists("ActionName", column_ifexists("ActionName_s", column_ifexists("action_name", ""))))
+    | where action_name == "runFailed"
     | count
   ) > 0;
   let optimizador_job01_ok = toscalar(
