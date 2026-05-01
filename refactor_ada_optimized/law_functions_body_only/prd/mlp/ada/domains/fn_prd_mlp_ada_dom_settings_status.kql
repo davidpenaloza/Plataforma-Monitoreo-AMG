@@ -26,4 +26,4 @@
   let job02_alert = iff(expected_job02 == 0, false, real_job02 == 0);
   let status = iff(job01_alert or job02_alert, "ALERT", "OK");
   print color = fn_mon_status_to_color(status)
-};
+;
