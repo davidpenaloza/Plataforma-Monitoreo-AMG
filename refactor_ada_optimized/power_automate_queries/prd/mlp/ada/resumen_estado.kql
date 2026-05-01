@@ -12,7 +12,9 @@ union
     (resumen | project orden = 6, producto = "Meteodata", estado = Meteodata),
     (resumen | project orden = 7, producto = "KPI", estado = KPI),
     (resumen | project orden = 8, producto = "Alarmas", estado = Alarmas),
-    (resumen | project orden = 9, producto = "Front", estado = Front)
+    (resumen | project orden = 9, producto = "Front", estado = Front),
+    (resumen | project orden = 10, producto = "Optimizador Mezcla", estado = ["Optimizador Mezcla"]),
+    (resumen | project orden = 11, producto = "Settings", estado = Settings)
 | extend color = case(
     estado == "ALERT", "#E53935",
     estado == "WARNING", "#FFF4CC",
