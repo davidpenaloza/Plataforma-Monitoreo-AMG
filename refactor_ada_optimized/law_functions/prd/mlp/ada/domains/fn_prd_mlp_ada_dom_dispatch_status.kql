@@ -6,12 +6,6 @@ let fn_prd_mlp_ada_dom_dispatch_status = (startTime:datetime, endTime:datetime) 
   ]);
   let lag_classic = fn_prd_mlp_ada_lag_helpers(dispatch_tables, startTime, endTime);
   let lag_nrt = fn_prd_mlp_ada_alert_from_dispatch_nrt_logs(dispatch_tables, startTime, endTime);
-  let adaJobsDispatchAlert = toscalar(
-    fn_prd_mlp_ada_jobs_status_detail(startTime, endTime)
-    | where domain == "NRT Dispatch"
-    | summarize alertCount = countif(isAlert == true)
-    | project alertCount > 0
-  );
   let consec_fail_job17 = toscalar(
     range TimeGeneratedBin_Chile from bin(endTime - 30m, 10m) to bin(endTime, 10m) step 10m
     | join kind=leftouter (
@@ -32,6 +26,6 @@ let fn_prd_mlp_ada_dom_dispatch_status = (startTime:datetime, endTime:datetime) 
     | where rn == 1
     | project alerta = is_fail == 1 and next_fail == 1
   );
-  let status = iff(lag_classic == "ALERT" or lag_nrt == "ALERT" or consec_fail_job17 or adaJobsDispatchAlert, "ALERT", "OK");
+  let status = iff(lag_classic == "ALERT" or lag_nrt == "ALERT" or consec_fail_job17, "ALERT", "OK");
   print color = fn_mon_status_to_color(status)
 };
