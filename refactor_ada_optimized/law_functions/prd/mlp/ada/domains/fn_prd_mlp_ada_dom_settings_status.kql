@@ -1,22 +1,30 @@
 let fn_prd_mlp_ada_dom_settings_status = (startTime:datetime, endTime:datetime) {
-  let threshold_job01_minutes = 60.0;
-  let threshold_job02_minutes = 120.0;
-  let job01_last_success = toscalar(
+  let expected_job01 = toscalar(
+    range ts from startTime to endTime step 1m
+    | where datetime_part("minute", ts) == 0
+    | count
+  );
+  let expected_job02 = toscalar(
+    range ts from startTime to endTime step 1m
+    | where datetime_part("minute", ts) == 0 and datetime_part("hour", ts) in (12,18)
+    | count
+  );
+  let real_job01 = toscalar(
     fn_src_mlp_ws_prfci("ContainerAppSystemLogs_CL", startTime - 4h, endTime)
     | where TimeGenerated >= startTime - 4h and TimeGenerated < endTime
     | where JobName_s == "mlp-prd-caj-prfci-job01"
     | where Log_s contains "has successfully completed"
-    | summarize max(TimeGenerated)
+    | count
   );
-  let job02_last_success = toscalar(
+  let real_job02 = toscalar(
     fn_src_mlp_ws_prfci("ContainerAppSystemLogs_CL", startTime - 4h, endTime)
     | where TimeGenerated >= startTime - 4h and TimeGenerated < endTime
     | where JobName_s == "mlp-prd-caj-prfci-job02"
     | where Log_s contains "has successfully completed"
-    | summarize max(TimeGenerated)
+    | count
   );
-  let stale_job01 = isnull(job01_last_success) or todouble(datetime_diff('minute', endTime, job01_last_success)) > threshold_job01_minutes;
-  let stale_job02 = isnull(job02_last_success) or todouble(datetime_diff('minute', endTime, job02_last_success)) > threshold_job02_minutes;
-  let status = iff(stale_job01 or stale_job02, "ALERT", "OK");
+  let job01_alert = iff(expected_job01 == 0, false, real_job01 == 0);
+  let job02_alert = iff(expected_job02 == 0, false, real_job02 == 0);
+  let status = iff(job01_alert or job02_alert, "ALERT", "OK");
   print color = fn_mon_status_to_color(status)
 };
