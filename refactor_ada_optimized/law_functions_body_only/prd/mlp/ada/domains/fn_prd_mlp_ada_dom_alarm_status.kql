@@ -1,10 +1,4 @@
 
-  let adaJobsAlarmAlert = toscalar(
-    fn_prd_mlp_ada_jobs_status_detail(startTime, endTime)
-    | where domain == "Alarmas"
-    | summarize alertCount = countif(isAlert == true)
-    | project alertCount > 0
-  );
   let incidentes_largos_alarmas = toscalar(
     fn_src_mlp_ws_ada("ContainerAppConsoleLogs_CL", endTime - 3h, endTime)
     | where TimeGenerated >= endTime - 3h and TimeGenerated < endTime
@@ -46,6 +40,6 @@
 //    | count
 //    );
 //let status = iff(not(job06_ok) or not(job07_ok) or errores > 177, "ALERT", "OK");
-  let status = iff(adaJobsAlarmAlert or incidentes_largos_alarmas > 0 or error_conexion_storage > 0, "ALERT", "OK");
+  let status = iff(incidentes_largos_alarmas > 0 or error_conexion_storage > 0, "ALERT", "OK");
 
   print color = fn_mon_status_to_color(status)
