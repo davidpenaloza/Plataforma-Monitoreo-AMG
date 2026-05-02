@@ -1,0 +1,2 @@
+fn_prd_mlp_ada_amg_jobs_status_detail(bin($__timeFrom, 1m), bin($__timeTo, 1m))
+| order by TimeGeneratedBin_Chile desc, domain asc, jobName asc

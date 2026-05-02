@@ -1,0 +1,3 @@
+fn_prd_mlp_ada_amg_dom_meteodata_status(bin($__timeFrom, 1m), bin($__timeTo, 1m))
+| project status
+| take 1

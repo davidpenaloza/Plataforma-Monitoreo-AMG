@@ -1,0 +1,3 @@
+fn_prd_mlp_ada_amg_jobs_status_detail(bin($__timeFrom, 1m), bin($__timeTo, 1m))
+| project TimeGeneratedBin_Chile, domain, jobName, jobAlias, statusText, status, realCount, expectedCount, expectedVsRealPct, thresholdMinutes, isAlert, reason
+| order by TimeGeneratedBin_Chile desc, domain asc, jobName asc
