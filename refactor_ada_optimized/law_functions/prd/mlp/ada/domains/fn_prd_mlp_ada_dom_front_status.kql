@@ -4,6 +4,6 @@ let fn_prd_mlp_ada_dom_front_status = (startTime:datetime, endTime:datetime) {
     | where TimeGenerated between (endTime - 10m .. endTime)
     | where (Level == "Error" and ResultDescription contains "/usr/src/app/app/") or ResultDescription contains "Invalid access token"
     | count
-  ) > 0;
+   ) > 2;
   print color = fn_mon_status_to_color(iff(has_alert, "ALERT", "OK"))
 };

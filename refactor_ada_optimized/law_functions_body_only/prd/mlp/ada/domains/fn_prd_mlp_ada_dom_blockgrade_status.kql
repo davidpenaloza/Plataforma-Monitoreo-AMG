@@ -14,5 +14,6 @@
     | count
   ) > 0;
   let lag = fn_prd_mlp_ada_lag_helpers(dynamic(["blockgrade_bybucket"]), startTime, endTime);
-  let status = iff(not(en_mantencion) and (not(ing_ok) or lag == "ALERT"), "ALERT", "OK");
+  // Paridad legacy: alerta por ingesta ADF o lag, sin compuerta de mantención.
+  let status = iff(not(ing_ok) or lag == "ALERT", "ALERT", "OK");
   print color = fn_mon_status_to_color(status)
