@@ -17,5 +17,5 @@ let fn_prd_mlp_ada_amg_dom_plans_status = (startTime:datetime, endTime:datetime)
       "planes_acc_mensuales_PLANTA_CONCENTRADORA_RECUPERACION_CU"
   ]), startTime, endTime);
   let status = iff(not(job_ok) or lag == "ALERT", "ALERT", "OK");
-  print status = status
+  print status
 };

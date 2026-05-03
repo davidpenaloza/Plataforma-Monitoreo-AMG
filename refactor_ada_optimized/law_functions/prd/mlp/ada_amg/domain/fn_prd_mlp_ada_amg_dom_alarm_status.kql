@@ -18,5 +18,5 @@ let fn_prd_mlp_ada_amg_dom_alarm_status = (startTime:datetime, endTime:datetime)
     | project alertCount > 0
   );
   let status = iff(not(job06_ok) or not(job07_ok) or adaJobsAlarmAlert, "ALERT", "OK");
-  print color = fn_mon_status_to_color(status)
+  print status
 };
