@@ -5,7 +5,7 @@ Entregar una comparación directa entre la lógica refactorizada por dominio y l
 
 ## Resumen ejecutivo
 - **Equivalencia alta** en dominios principales (Dispatch, KPIs, Alarmas) cuando se evalúa estado `ALERT/OK`.
-- **Equivalencia funcional extendida** para `Optimizador Mezcla` y `Settings`, dominios agregados al consolidado actual y al resumen de Power Automate.
+- **Cobertura extendida opcional** para `Optimizador Mezcla` y `Settings`, dominios agregados al consolidado actual y al resumen de Power Automate.
 - Para dominios sin señal directa en `jobs_status_detail`, la validación marca **`NO_JOB_SIGNAL`** (no se interpreta como brecha funcional por sí sola).
 
 ## Comparación por dominio
@@ -20,19 +20,23 @@ Entregar una comparación directa entre la lógica refactorizada por dominio y l
 
 ## Criterio de equivalencia aplicado
 1. Se compara estado de dominio en salida refactor (`ALERT` / `OK`) contra señal de referencia job-level cuando existe.
-2. Si un dominio no tiene señal job-level directa en `jobs_status_detail`, se etiqueta como `NO_JOB_SIGNAL`.
-3. `NO_JOB_SIGNAL` implica **falta de proxy job-level**, no necesariamente falta de equivalencia de negocio.
+2. El contraste estricto se limita a dominios con proxy job-level directo y reglas legacy.
+3. Cualquier extensión de dominio fuera del legacy se valida por separado, no en esta paridad 1:1.
 
 ## Query de validación recomendada
 Usar:
 - `refactor_ada_optimized/power_automate_queries/prd/mlp/ada/legacy_parity_check.kql`
 
 Esta consulta ya:
-- incluye `Dispatch`, `KPIs`, `Alarmas`, `Optimizador Mezcla`, `Settings`,
+- incluye los dominios de paridad estricta legacy: `Dispatch`, `KPIs`, `Alarmas`,
 - compara estado de dominio vs proxy job-level,
-- marca `MATCH`, `DIFF` o `NO_JOB_SIGNAL`.
+- marca `MATCH` o `DIFF` para contraste 1:1.
 
 ## Lectura práctica de resultados
 - **MATCH**: dominio alineado en semántica operativa.
 - **DIFF**: revisar ventana temporal, tolerancias de dominio y/o fuente de datos.
-- **NO_JOB_SIGNAL**: validar contra lógica de dominio (no contra jobs_detail), especialmente para extensiones como Settings/Optimizador.
+- **Extensiones fuera de legacy**: validar con checks de dominio dedicados (sin mezclar con la paridad 1:1).
+
+
+## Nota de equivalencia estricta
+Para paridad 1:1 con legacy, el comparativo operativo considera solo `Dispatch`, `KPIs` y `Alarmas` en `legacy_parity_check.kql`.
