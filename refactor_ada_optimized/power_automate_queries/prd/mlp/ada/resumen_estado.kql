@@ -11,7 +11,9 @@ fn_prd_mlp_ada_dom_global_status(ago(lookback), now())
     pack("orden", 6, "producto", "Meteodata", "estado", Meteodata),
     pack("orden", 7, "producto", "KPI", "estado", KPI),
     pack("orden", 8, "producto", "Alarmas", "estado", Alarmas),
-    pack("orden", 9, "producto", "Front", "estado", Front)
+    pack("orden", 9, "producto", "Front", "estado", Front),
+    pack("orden", 10, "producto", "Optimizador Mezcla", "estado", ['Optimizador Mezcla']),
+    pack("orden", 11, "producto", "Settings", "estado", Settings)
 )
 | mv-expand row = rows
 | project

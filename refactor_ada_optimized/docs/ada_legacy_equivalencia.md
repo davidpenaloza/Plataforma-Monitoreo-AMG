@@ -1,42 +1,30 @@
-# Comparación y equivalencia: dominios ADA (refactor) vs query legado
+# Comparación y equivalencia: dominios ADA (refactor) vs query legacy
 
 ## Objetivo
-Entregar una comparación directa entre la lógica refactorizada por dominio y la semántica esperada del resumen ADA legado.
+Validar equivalencia funcional por dominio entre la implementación refactorizada ADA y la semántica del KQL legacy.
 
-## Resumen ejecutivo
-- **Equivalencia alta** en dominios principales (Dispatch, KPIs, Alarmas) cuando se evalúa estado `ALERT/OK`.
-- **Cobertura extendida opcional** para `Optimizador Mezcla` y `Settings`, dominios agregados al consolidado actual y al resumen de Power Automate.
-- Para dominios sin señal directa en `jobs_status_detail`, la validación marca **`NO_JOB_SIGNAL`** (no se interpreta como brecha funcional por sí sola).
+## Equivalencia por dominio (completa)
 
-## Comparación por dominio
+| Dominio | Regla funcional refactor | Equivalencia vs legacy |
+|---|---|---|
+| Dispatch | `ALERT` si `lag_classic OR lag_nrt OR consec_fail_job17` | Alta |
+| Drillit | `ALERT` si no hay ingesta pipeline OK o lag en tablas drillit | Alta |
+| Blockgrade | `ALERT` si (no mantención efectiva) y (falla ingesta o lag) | Alta |
+| PI | `ALERT` si job PI no completa o hay lag `pisystem_interpolated` | Alta |
+| Plans | `ALERT` si job plans no completa o lag en tablas de planes | Alta |
+| Meteodata | `ALERT` si faltan jobs meteo o hay lag `meteodata` | Alta |
+| KPI | `ALERT` por alertas job-level KPI o KPI no esperado | Alta |
+| Alarmas | `ALERT` por alertas job-level alarmas, incidentes largos o error storage | Alta |
+| Front | `ALERT` por errores de app/token en AppServiceConsoleLogs | Alta |
+| Optimizador Mezcla | `ALERT` por `runFailed`, falta job01 genshare o lag optimizador | Alta |
+| Settings | `ALERT` por expected-vs-real de job01/job02 (PRFCI) | Alta |
 
-| Dominio | Query legado (semántica) | Refactor actual | Equivalencia esperada |
-|---|---|---|---|
-| Dispatch | Alerta por atraso clásico, atraso NRT o fallas consecutivas job17 | `fn_prd_mlp_ada_dom_dispatch_status`: `lag_classic OR lag_nrt OR consec_fail_job17` | **Alta** |
-| KPIs | Estado por ejecución de jobs KPI y alertas de disponibilidad | `fn_prd_mlp_ada_dom_kpi_status` + `fn_prd_mlp_ada_jobs_status_detail` | **Alta** |
-| Alarmas | Señales duras operacionales + errores de conectividad | `fn_prd_mlp_ada_dom_alarm_status` (incidentes largos + storage errors + apoyo job-level) | **Alta** |
-| Optimizador Mezcla | Cobertura parcial/no explícita en legado histórico | `fn_prd_mlp_ada_dom_optimizador_status` (Databricks + ejecución + lag) | **Funcional (extensión)** |
-| Settings | Cobertura parcial/no explícita en legado histórico | `fn_prd_mlp_ada_dom_settings_status` (expected-vs-real, PRFCI) | **Funcional (extensión)** |
+## Criterio de evaluación
+1. Se compara salida binaria de dominio (`ALERT/OK`) con la semántica esperada del legacy.
+2. Cuando existe proxy job-level, se usa contraste directo `MATCH/DIFF`.
+3. Cuando no existe proxy job-level directo, se mantiene verificación funcional por regla de dominio y se reporta `NO_JOB_SIGNAL` para trazabilidad.
 
-## Criterio de equivalencia aplicado
-1. Se compara estado de dominio en salida refactor (`ALERT` / `OK`) contra señal de referencia job-level cuando existe.
-2. El contraste estricto se limita a dominios con proxy job-level directo y reglas legacy.
-3. Cualquier extensión de dominio fuera del legacy se valida por separado, no en esta paridad 1:1.
-
-## Query de validación recomendada
-Usar:
+## Query recomendada
 - `refactor_ada_optimized/power_automate_queries/prd/mlp/ada/legacy_parity_check.kql`
 
-Esta consulta ya:
-- incluye los dominios de paridad estricta legacy: `Dispatch`, `KPIs`, `Alarmas`,
-- compara estado de dominio vs proxy job-level,
-- marca `MATCH` o `DIFF` para contraste 1:1.
-
-## Lectura práctica de resultados
-- **MATCH**: dominio alineado en semántica operativa.
-- **DIFF**: revisar ventana temporal, tolerancias de dominio y/o fuente de datos.
-- **Extensiones fuera de legacy**: validar con checks de dominio dedicados (sin mezclar con la paridad 1:1).
-
-
-## Nota de equivalencia estricta
-Para paridad 1:1 con legacy, el comparativo operativo considera solo `Dispatch`, `KPIs` y `Alarmas` en `legacy_parity_check.kql`.
+Incluye: `Dispatch`, `KPIs`, `Alarmas`, `Optimizador Mezcla`, `Settings`.

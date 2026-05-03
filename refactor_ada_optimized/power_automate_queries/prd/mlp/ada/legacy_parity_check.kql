@@ -22,14 +22,16 @@ let summary_domains =
     union
       (fn_prd_mlp_ada_dom_dispatch_status(startTime, endTime) | project domain = "NRT Dispatch", status_domain = iff(color == "#E53935", "ALERT", "OK")),
       (fn_prd_mlp_ada_dom_kpi_status(startTime, endTime) | project domain = "KPIs", status_domain = iff(color == "#E53935", "ALERT", "OK")),
-      (fn_prd_mlp_ada_dom_alarm_status(startTime, endTime) | project domain = "Alarmas", status_domain = iff(color == "#E53935", "ALERT", "OK"));
+      (fn_prd_mlp_ada_dom_alarm_status(startTime, endTime) | project domain = "Alarmas", status_domain = iff(color == "#E53935", "ALERT", "OK")),
+      (fn_prd_mlp_ada_dom_optimizador_status(startTime, endTime) | project domain = "Optimizador Mezcla", status_domain = iff(color == "#E53935", "ALERT", "OK")),
+      (fn_prd_mlp_ada_dom_settings_status(startTime, endTime) | project domain = "Settings", status_domain = iff(color == "#E53935", "ALERT", "OK"));
 let global =
     fn_prd_mlp_ada_dom_global_status(startTime, endTime)
     | project Dispatch, KPI, Alarmas, ['Optimizador Mezcla'], Settings;
 jobs_latest
-| join kind=leftouter summary_domains on domain
-| where domain in ("NRT Dispatch", "KPIs", "Alarmas")
-| extend parity = iff(status_jobs_detail == status_domain, "MATCH", "DIFF")
+| join kind=fullouter summary_domains on domain
+| extend status_jobs_detail = coalesce(status_jobs_detail, "N/A")
+| extend parity = iff(status_jobs_detail == "N/A", "NO_JOB_SIGNAL", iff(status_jobs_detail == status_domain, "MATCH", "DIFF"))
 | extend alert_ratio = iff(total_jobs == 0 or isnull(total_jobs), real(null), todouble(alerts_jobs) / todouble(total_jobs))
 | extend JoinKey = 1
 | join kind=leftouter (global | extend JoinKey = 1) on JoinKey
