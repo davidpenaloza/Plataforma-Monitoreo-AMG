@@ -1,0 +1,60 @@
+// Gate de equivalencia estricta ADA vs legacy.
+// Uso: ejecutar en misma ventana temporal que el panel legacy y reemplazar <LEGACY_RESULT_QUERY>
+// por la consulta legacy que retorna columnas de dominio con valores Alertar/No Alertar.
+let lookback = 24h;
+let startTime = ago(lookback);
+let endTime = now();
+let refactor =
+    fn_prd_mlp_ada_dom_global_status(startTime, endTime)
+    | project
+        ref_dispatch = iff(Dispatch == "ALERT", "Alertar", "No Alertar"),
+        ref_drillit = iff(Drillit == "ALERT", "Alertar", "No Alertar"),
+        ref_blockgrade = iff(Blockgrade == "ALERT", "Alertar", "No Alertar"),
+        ref_pi = iff(PI == "ALERT", "Alertar", "No Alertar"),
+        ref_plans = iff(Plans == "ALERT", "Alertar", "No Alertar"),
+        ref_meteo = iff(Meteodata == "ALERT", "Alertar", "No Alertar"),
+        ref_kpis = iff(KPI == "ALERT", "Alertar", "No Alertar"),
+        ref_alarmas = iff(Alarmas == "ALERT", "Alertar", "No Alertar"),
+        ref_front = iff(Front == "ALERT", "Alertar", "No Alertar"),
+        ref_optimizador = iff(['Optimizador Mezcla'] == "ALERT", "Alertar", "No Alertar"),
+        ref_settings = iff(Settings == "ALERT", "Alertar", "No Alertar");
+let legacy =
+    (<LEGACY_RESULT_QUERY>)
+    | project
+        leg_dispatch = ['NRT Dispatch'],
+        leg_drillit = Drillit,
+        leg_blockgrade = Blockgrade,
+        leg_pi = PI,
+        leg_plans = Plans,
+        leg_meteo = Meteo,
+        leg_kpis = KPIs,
+        leg_alarmas = Alarmas,
+        leg_front = Front,
+        leg_optimizador = ['Optimizador Mezcla'],
+        leg_settings = Settings;
+refactor
+| extend JoinKey = 1
+| join kind=inner (legacy | extend JoinKey = 1) on JoinKey
+| project-away JoinKey, JoinKey1
+| extend rows = pack_array(
+    pack("domain","Dispatch","refactor",ref_dispatch,"legacy",leg_dispatch),
+    pack("domain","Drillit","refactor",ref_drillit,"legacy",leg_drillit),
+    pack("domain","Blockgrade","refactor",ref_blockgrade,"legacy",leg_blockgrade),
+    pack("domain","PI","refactor",ref_pi,"legacy",leg_pi),
+    pack("domain","Plans","refactor",ref_plans,"legacy",leg_plans),
+    pack("domain","Meteo","refactor",ref_meteo,"legacy",leg_meteo),
+    pack("domain","KPIs","refactor",ref_kpis,"legacy",leg_kpis),
+    pack("domain","Alarmas","refactor",ref_alarmas,"legacy",leg_alarmas),
+    pack("domain","Front","refactor",ref_front,"legacy",leg_front),
+    pack("domain","Optimizador Mezcla","refactor",ref_optimizador,"legacy",leg_optimizador),
+    pack("domain","Settings","refactor",ref_settings,"legacy",leg_settings)
+)
+| mv-expand row = rows
+| extend domain=tostring(row.domain), refactor_status=tostring(row.refactor), legacy_status=tostring(row.legacy)
+| extend match = refactor_status == legacy_status
+| summarize
+    matched = countif(match),
+    total = count(),
+    equivalence_pct = round(100.0 * todouble(countif(match)) / todouble(count()), 2),
+    mismatches = make_set_if(strcat(domain,":",refactor_status,"!=",legacy_status), not(match))
+| extend gate = iff(equivalence_pct == 100.0, "PASS", "FAIL")

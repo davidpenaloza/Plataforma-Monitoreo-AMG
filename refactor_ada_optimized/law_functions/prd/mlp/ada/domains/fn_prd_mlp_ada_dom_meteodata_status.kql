@@ -1,13 +1,29 @@
 let fn_prd_mlp_ada_dom_meteodata_status = (startTime:datetime, endTime:datetime) {
-  let jobs_ok_count = toscalar(
-    fn_src_mlp_systemlogs_all(startTime - 35m, endTime)
-    | where JobName_s in ("mlp-prd-caj-meteo-job01", "mlp-prd-caj-meteo-job02") // filtro temprano por dominio
-    | where Log_s contains "has successfully completed"
-    | summarize c = dcount(JobName_s)
+  let expected_job01 = toscalar(
+    range ts from startTime to endTime step 1m
+    | where datetime_part("minute", ts) in (0, 15, 30, 45)
+    | count
   );
-  let job01_ok = jobs_ok_count >= 1;
-  let job02_ok = jobs_ok_count >= 2;
+  let expected_job02 = toscalar(
+    range ts from startTime to endTime step 1m
+    | where datetime_part("minute", ts) in (1, 16, 31, 46)
+    | count
+  );
+  let real_job01 = toscalar(
+    fn_src_mlp_systemlogs_all(startTime - 35m, endTime)
+    | where JobName_s == "mlp-prd-caj-meteo-job01"
+    | where Log_s contains "has successfully completed"
+    | count
+  );
+  let real_job02 = toscalar(
+    fn_src_mlp_systemlogs_all(startTime - 35m, endTime)
+    | where JobName_s == "mlp-prd-caj-meteo-job02"
+    | where Log_s contains "has successfully completed"
+    | count
+  );
+  let job01_alert = iff(expected_job01 == 0, false, real_job01 < ceiling(0.85 * expected_job01));
+  let job02_alert = iff(expected_job02 == 0, false, real_job02 < ceiling(0.85 * expected_job02));
   let lag = fn_prd_mlp_ada_lag_helpers(dynamic(["meteodata"]), startTime, endTime);
-  let status = iff(not(job01_ok) or not(job02_ok) or lag == "ALERT", "ALERT", "OK");
+  let status = iff(job01_alert or job02_alert or lag == "ALERT", "ALERT", "OK");
   print color = fn_mon_status_to_color(status)
 };
