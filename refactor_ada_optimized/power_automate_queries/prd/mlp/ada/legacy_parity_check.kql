@@ -1,5 +1,5 @@
 // Validación comparativa refactor (dominios) vs diagnóstico job-level ADA.
-// Objetivo: entregar señales objetivas para revisar paridad funcional contra el enfoque legacy.
+// Objetivo: revisar equivalencia funcional frente al enfoque legacy.
 let lookback = 24h;
 let startTime = ago(lookback);
 let endTime = now();
@@ -14,38 +14,25 @@ let jobs_rollup =
         warnings_jobs = countif(status == "w"),
         saturated_jobs = countif(status == "s")
       by domain, TimeGeneratedBin_Chile
-    | extend jobs_domain_status = iff(alerts_jobs > 0, "ALERT", "OK");
+    | extend status_jobs_detail = iff(alerts_jobs > 0, "ALERT", "OK");
 let jobs_latest =
     jobs_rollup
     | summarize arg_max(TimeGeneratedBin_Chile, *) by domain;
-let domain_dispatch = toscalar(
-    fn_prd_mlp_ada_dom_dispatch_status(startTime, endTime)
-    | project status = iff(color == "#E53935", "ALERT", "OK")
-    | take 1
-);
-let domain_kpi = toscalar(
-    fn_prd_mlp_ada_dom_kpi_status(startTime, endTime)
-    | project status = iff(color == "#E53935", "ALERT", "OK")
-    | take 1
-);
-let domain_alarm = toscalar(
-    fn_prd_mlp_ada_dom_alarm_status(startTime, endTime)
-    | project status = iff(color == "#E53935", "ALERT", "OK")
-    | take 1
-);
 let summary_domains =
     union
-      (print domain = "NRT Dispatch", status_domain = domain_dispatch),
-      (print domain = "KPIs", status_domain = domain_kpi),
-      (print domain = "Alarmas", status_domain = domain_alarm);
+      (fn_prd_mlp_ada_dom_dispatch_status(startTime, endTime) | project domain = "NRT Dispatch", status_domain = iff(color == "#E53935", "ALERT", "OK")),
+      (fn_prd_mlp_ada_dom_kpi_status(startTime, endTime) | project domain = "KPIs", status_domain = iff(color == "#E53935", "ALERT", "OK")),
+      (fn_prd_mlp_ada_dom_alarm_status(startTime, endTime) | project domain = "Alarmas", status_domain = iff(color == "#E53935", "ALERT", "OK")),
+      (fn_prd_mlp_ada_dom_optimizador_status(startTime, endTime) | project domain = "Optimizador Mezcla", status_domain = iff(color == "#E53935", "ALERT", "OK")),
+      (fn_prd_mlp_ada_dom_settings_status(startTime, endTime) | project domain = "Settings", status_domain = iff(color == "#E53935", "ALERT", "OK"));
 let global =
     fn_prd_mlp_ada_dom_global_status(startTime, endTime)
-    | project Dispatch, KPI, Alarmas;
+    | project Dispatch, KPI, Alarmas, ['Optimizador Mezcla'], Settings;
 jobs_latest
-| join kind=leftouter summary_domains on domain
-| extend status_jobs_detail = jobs_domain_status
-| extend parity = iff(status_jobs_detail == status_domain, "MATCH", "DIFF")
-| extend alert_ratio = iff(total_jobs == 0, real(null), todouble(alerts_jobs) / todouble(total_jobs))
+| join kind=fullouter summary_domains on domain
+| extend status_jobs_detail = coalesce(status_jobs_detail, "N/A")
+| extend parity = iff(status_jobs_detail == "N/A", "NO_JOB_SIGNAL", iff(status_jobs_detail == status_domain, "MATCH", "DIFF"))
+| extend alert_ratio = iff(total_jobs == 0 or isnull(total_jobs), real(null), todouble(alerts_jobs) / todouble(total_jobs))
 | extend JoinKey = 1
 | join kind=leftouter (global | extend JoinKey = 1) on JoinKey
 | project-away JoinKey, JoinKey1
@@ -63,6 +50,8 @@ jobs_latest
     Dispatch,
     KPI,
     Alarmas,
+    ['Optimizador Mezcla'],
+    Settings,
     startTime,
     endTime
 | order by domain asc
