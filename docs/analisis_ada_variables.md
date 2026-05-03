@@ -197,3 +197,7 @@ Resultado: mismas salidas para HTML (`color`), menor superficie duplicada y mejo
 - Variables ADA existen en `templating.list` (`var_mlp_ada_*`).
 - El panel HTML consume `${var_mlp_ada_*:raw}` para chips ADA.
 - Se observa referencia comentada a `${var_mlp_ada_ingestas_global:raw}` en el HTML.
+
+## F) Nota operativa para despliegue
+
+Para reducir riesgo en producción, conviene habilitar la función `fn_ada_health_base` en paralelo durante una ventana de validación y comparar los colores resultantes de los wrappers contra el dashboard actual antes del corte definitivo.
