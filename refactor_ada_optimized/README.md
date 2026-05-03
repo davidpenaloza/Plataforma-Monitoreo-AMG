@@ -244,3 +244,4 @@ python refactor_ada_optimized/check_conflict_markers.py
 - Alarmas usa señales duras (`incidentes_largos_alarmas` y `error_conexion_storage`).
 - Settings se evalúa en esquema expected-vs-real con source PRFCI dedicado.
 - Power Automate consume `fn_prd_mlp_ada_dom_global_status` vía `power_automate_queries/prd/mlp/ada/resumen_estado.kql`.
+- La validación `power_automate_queries/prd/mlp/ada/legacy_parity_check.kql` compara dominio refactor vs señal job-level y marca `NO_JOB_SIGNAL` para dominios sin métrica directa en `jobs_status_detail` (p. ej. Optimizador/Settings).
