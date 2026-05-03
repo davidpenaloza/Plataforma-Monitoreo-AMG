@@ -44,3 +44,9 @@ Esto replica la regla de alto nivel usada en el panel: desactualización de tabl
 - `sed -n '1,220p' refactor_ada_optimized/law_functions/ada/helpers/fn_prd_mlp_ada_alert_from_dispatch_nrt_logs.kql`
 - `sed -n '1,260p' refactor_ada_optimized/law_functions/ada/helpers/fn_prd_mlp_ada_lag_helpers.kql`
 
+
+
+## Actualización 2026-05-02
+
+- Se retiró la condición extra `adaJobsDispatchAlert` del dominio Dispatch para mantener alineamiento estricto con la semántica legacy de panel.
+- Estado final permanece basado en: `lag_classic OR lag_nrt OR consec_fail_job17`.

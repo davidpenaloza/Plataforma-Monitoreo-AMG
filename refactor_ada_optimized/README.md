@@ -75,7 +75,7 @@ Funciones compartidas entre productos:
 - `fn_prd_mlp_ada_dom_front_status`: estado de Front.
 - `fn_prd_mlp_ada_dom_kpi_status`: estado de KPIs.
 - `fn_prd_mlp_ada_dom_optimizador_status`: estado de Optimizador Mezcla (Databricks + ejecución job01 genshare).
-- `fn_prd_mlp_ada_dom_settings_status`: estado de Settings (jobs prfci job01/job02 con umbrales 60/120 min).
+- `fn_prd_mlp_ada_dom_settings_status`: estado de Settings (expected-vs-real sobre jobs PRFCI: job01 minuto 00, job02 a las 12/18).
 - `fn_prd_mlp_ada_dom_global_status`: consolidado global ADA (incluye Settings y Optimizador Mezcla).
 
 ## 3.2 Helpers ADA
@@ -86,6 +86,9 @@ Funciones compartidas entre productos:
 
 ## 3.3 Sources ADA
 - Base genérica: `fn_src_mlp_ws_ada(sourceType, startTime, endTime)`.
+- Sources dedicados de dominio:
+  - `fn_src_mlp_ws_genshare(sourceType, startTime, endTime)`
+  - `fn_src_mlp_ws_prfci(sourceType, startTime, endTime)`
 - Relacionadas de pipeline/systemlogs:
   - `fn_src_mlp_ws_dispatch(sourceType, ...)`, `fn_src_mlp_ws_drillit(sourceType, ...)`, `fn_src_mlp_ws_blkgrde(sourceType, ...)`
   - `fn_src_mlp_ws_meteo(sourceType, ...)`, `fn_src_mlp_ws_plans(sourceType, ...)`
@@ -232,3 +235,13 @@ python refactor_ada_optimized/check_conflict_markers.py
 ### 9.4 Recomendación final
 - Para tablas de un workspace conocido: usar `fn_src_mlp_ws_<workspace>(sourceType, startTime, endTime)`.
 - Para escenarios multi-entorno (NOTPII Databricks): usar función controlada por enum (`env = dev|uat|all`) en vez de string totalmente libre para workspace.
+
+
+## 10) Estado de paridad legacy (ADA)
+
+- Objetivo operativo: mantener alta equivalencia funcional frente a la query legacy de resumen ADA para evitar falsos positivos.
+- Dispatch usa señales `lag_classic`, `lag_nrt` y `consec_fail_job17`.
+- Alarmas usa señales duras (`incidentes_largos_alarmas` y `error_conexion_storage`).
+- Settings se evalúa en esquema expected-vs-real con source PRFCI dedicado.
+- Power Automate consume `fn_prd_mlp_ada_dom_global_status` vía `power_automate_queries/prd/mlp/ada/resumen_estado.kql`.
+- La validación `power_automate_queries/prd/mlp/ada/legacy_parity_check.kql` compara dominio refactor vs señal job-level y marca `NO_JOB_SIGNAL` para dominios sin métrica directa en `jobs_status_detail` (p. ej. Optimizador/Settings).
