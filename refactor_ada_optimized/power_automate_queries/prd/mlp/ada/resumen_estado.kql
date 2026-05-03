@@ -1,18 +1,23 @@
 // Ventana de observación para ADA.
 // Debe respetar tolerancias de negocio de los dominios (fuentes + procesos con distinta cadencia).
 let lookback = 3h;
-let resumen = fn_prd_mlp_ada_dom_global_status(ago(lookback), now());
-
-union
-    (resumen | project orden = 1, producto = "Dispatch", estado = Dispatch),
-    (resumen | project orden = 2, producto = "Drillit", estado = Drillit),
-    (resumen | project orden = 3, producto = "Blockgrade", estado = Blockgrade),
-    (resumen | project orden = 4, producto = "PI", estado = PI),
-    (resumen | project orden = 5, producto = "Plans", estado = Plans),
-    (resumen | project orden = 6, producto = "Meteodata", estado = Meteodata),
-    (resumen | project orden = 7, producto = "KPI", estado = KPI),
-    (resumen | project orden = 8, producto = "Alarmas", estado = Alarmas),
-    (resumen | project orden = 9, producto = "Front", estado = Front)
+fn_prd_mlp_ada_dom_global_status(ago(lookback), now())
+| extend rows = pack_array(
+    pack("orden", 1, "producto", "Dispatch", "estado", Dispatch),
+    pack("orden", 2, "producto", "Drillit", "estado", Drillit),
+    pack("orden", 3, "producto", "Blockgrade", "estado", Blockgrade),
+    pack("orden", 4, "producto", "PI", "estado", PI),
+    pack("orden", 5, "producto", "Plans", "estado", Plans),
+    pack("orden", 6, "producto", "Meteodata", "estado", Meteodata),
+    pack("orden", 7, "producto", "KPI", "estado", KPI),
+    pack("orden", 8, "producto", "Alarmas", "estado", Alarmas),
+    pack("orden", 9, "producto", "Front", "estado", Front)
+)
+| mv-expand row = rows
+| project
+    orden = toint(row.orden),
+    producto = tostring(row.producto),
+    estado = tostring(row.estado)
 | extend color = case(
     estado == "ALERT", "#E53935",
     estado == "WARNING", "#FFF4CC",
