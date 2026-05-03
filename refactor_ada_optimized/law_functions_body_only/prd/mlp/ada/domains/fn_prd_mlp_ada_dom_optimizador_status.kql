@@ -4,15 +4,17 @@
     | mv-expand json_RequestParams
     | extend jobId = tostring(json_RequestParams.jobId)
     | where jobId == "1101447596243116"
-    | where ActionName == "runFailed"
+    | extend action_name = tostring(column_ifexists("ActionName", column_ifexists("ActionName_s", column_ifexists("action_name", ""))))
+    | where action_name == "runFailed"
     | count
   ) > 0;
   let optimizador_job01_ok = toscalar(
-    fn_src_mlp_ws_ada("ContainerAppSystemLogs_CL", endTime - 24h, endTime)
+    fn_src_mlp_ws_genshare("ContainerAppSystemLogs_CL", endTime - 24h, endTime)
     | where TimeGenerated >= endTime - 24h and TimeGenerated < endTime
     | where JobName_s == "ams-prd-caj-genshare-job01"
     | where Log_s contains "has successfully completed"
     | count
   ) > 0;
-  let status = iff(optimizador_run_failed or not(optimizador_job01_ok), "ALERT", "OK");
+  let lag_optimizador = fn_prd_mlp_ada_lag_helpers(dynamic(["optimizador_mezcla"]), startTime, endTime);
+  let status = iff(optimizador_run_failed or not(optimizador_job01_ok) or lag_optimizador == "ALERT", "ALERT", "OK");
   print color = fn_mon_status_to_color(status)
