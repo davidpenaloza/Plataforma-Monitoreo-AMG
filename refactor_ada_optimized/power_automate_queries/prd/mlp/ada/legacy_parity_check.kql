@@ -25,7 +25,7 @@ let summary_domains =
       (fn_prd_mlp_ada_dom_alarm_status(startTime, endTime) | project domain = "Alarmas", status_domain = iff(color == "#E53935", "ALERT", "OK"));
 let global =
     fn_prd_mlp_ada_dom_global_status(startTime, endTime)
-    | project Dispatch, KPI, Alarmas;
+    | project Dispatch, KPI, Alarmas, ['Optimizador Mezcla'], Settings;
 jobs_latest
 | join kind=leftouter summary_domains on domain
 | where domain in ("NRT Dispatch", "KPIs", "Alarmas")
@@ -48,6 +48,8 @@ jobs_latest
     Dispatch,
     KPI,
     Alarmas,
+    ['Optimizador Mezcla'],
+    Settings,
     startTime,
     endTime
 | order by domain asc
