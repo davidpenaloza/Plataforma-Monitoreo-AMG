@@ -7,7 +7,7 @@ let fn_prd_mlp_ada_dom_alarm_status = (startTime:datetime, endTime:datetime) {
   );
   let incidentes_largos_alarmas = toscalar(
     fn_src_mlp_ws_ada("ContainerAppConsoleLogs_CL", endTime - 3h, endTime)
-    | where TimeGenerated >= endTime - 3h and TimeGenerated < endTime
+    | where TimeGenerated >= ago(3h)
     | where ContainerJobName_s startswith "mlp-prd-caj-ada-job07"
     | where Log_s startswith "{\"fecha_log_UTC\":"
     | extend ParsedJson = parse_json(Log_s)

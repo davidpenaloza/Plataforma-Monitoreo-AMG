@@ -6,7 +6,7 @@ let fn_prd_mlp_ada_dom_kpi_status = (startTime:datetime, endTime:datetime) {
     | project alertCount > 0
   );
   let count_no_esperados = toscalar(
-    fn_prd_mlp_ada_kpi_alert_rows(endTime - 180m, endTime)
+    fn_prd_mlp_ada_kpi_alert_rows(endTime - 10m, endTime)
     | summarize c = dcount(KPINoEsperado)
     | project c
   );
