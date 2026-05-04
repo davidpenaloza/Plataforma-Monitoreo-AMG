@@ -1,57 +1,56 @@
-// Validación comparativa refactor (dominios) vs diagnóstico job-level ADA.
-// Objetivo: revisar equivalencia funcional frente al enfoque legacy.
+// Validación comparativa end-to-end refactor (dominios) vs diagnóstico legacy ADA.
+// Uso: ejecutar el script completo de una sola vez (sin bloques duplicados).
 let lookback = 24h;
 let startTime = ago(lookback);
 let endTime = now();
-let jobs_detail =
+
+// ===== LEGACY (job-level consolidado) =====
+let legacy_raw =
     fn_prd_mlp_ada_jobs_status_detail(startTime, endTime)
-    | project TimeGeneratedBin_Chile, domain, jobName, jobAlias, status, statusText, isAlert, realCount, expectedCount, expectedVsRealPct;
-let jobs_rollup =
-    jobs_detail
     | summarize
-        total_jobs = dcount(jobName),
-        alerts_jobs = countif(isAlert == true),
-        warnings_jobs = countif(status == "w"),
-        saturated_jobs = countif(status == "s")
-      by domain, TimeGeneratedBin_Chile
-    | extend status_jobs_detail = iff(alerts_jobs > 0, "ALERT", "OK");
-let jobs_latest =
-    jobs_rollup
-    | summarize arg_max(TimeGeneratedBin_Chile, *) by domain;
-let summary_domains =
-    union
-      (fn_prd_mlp_ada_dom_dispatch_status(startTime, endTime) | project domain = "NRT Dispatch", status_domain = iff(color == "#E53935", "ALERT", "OK")),
-      (fn_prd_mlp_ada_dom_kpi_status(startTime, endTime) | project domain = "KPIs", status_domain = iff(color == "#E53935", "ALERT", "OK")),
-      (fn_prd_mlp_ada_dom_alarm_status(startTime, endTime) | project domain = "Alarmas", status_domain = iff(color == "#E53935", "ALERT", "OK")),
-      (fn_prd_mlp_ada_dom_optimizador_status(startTime, endTime) | project domain = "Optimizador Mezcla", status_domain = iff(color == "#E53935", "ALERT", "OK")),
-      (fn_prd_mlp_ada_dom_settings_status(startTime, endTime) | project domain = "Settings", status_domain = iff(color == "#E53935", "ALERT", "OK"));
-let global =
-    fn_prd_mlp_ada_dom_global_status(startTime, endTime)
-    | project Dispatch, KPI, Alarmas, ['Optimizador Mezcla'], Settings;
-jobs_latest
-| join kind=fullouter summary_domains on domain
-| extend status_jobs_detail = coalesce(status_jobs_detail, "N/A")
-| extend parity = iff(status_jobs_detail == "N/A", "NO_JOB_SIGNAL", iff(status_jobs_detail == status_domain, "MATCH", "DIFF"))
-| extend alert_ratio = iff(total_jobs == 0 or isnull(total_jobs), real(null), todouble(alerts_jobs) / todouble(total_jobs))
-| extend JoinKey = 1
-| join kind=leftouter (global | extend JoinKey = 1) on JoinKey
-| project-away JoinKey, JoinKey1
-| project
-    TimeGeneratedBin_Chile,
-    domain,
-    status_domain,
-    status_jobs_detail,
-    parity,
-    total_jobs,
-    alerts_jobs,
-    alert_ratio,
-    warnings_jobs,
-    saturated_jobs,
-    Dispatch,
-    KPI,
-    Alarmas,
-    ['Optimizador Mezcla'],
-    Settings,
-    startTime,
-    endTime
-| order by domain asc
+        ['NRT Dispatch'] = iff(countif(domain == "NRT Dispatch" and isAlert == true) > 0, "Alertar", "No Alertar"),
+        Drillit = iff(countif(domain == "Drillit" and isAlert == true) > 0, "Alertar", "No Alertar"),
+        Blockgrade = iff(countif(domain == "Blockgrade" and isAlert == true) > 0, "Alertar", "No Alertar"),
+        PI = iff(countif(domain == "PI" and isAlert == true) > 0, "Alertar", "No Alertar"),
+        Plans = iff(countif(domain == "Plans" and isAlert == true) > 0, "Alertar", "No Alertar"),
+        Meteo = iff(countif(domain == "Meteodata" and isAlert == true) > 0, "Alertar", "No Alertar"),
+        KPIs = iff(countif(domain == "KPI" and isAlert == true) > 0, "Alertar", "No Alertar"),
+        Alarmas = iff(countif(domain == "Alarmas" and isAlert == true) > 0, "Alertar", "No Alertar"),
+        Front = iff(countif(domain == "Front" and isAlert == true) > 0, "Alertar", "No Alertar"),
+        ['Optimizador Mezcla'] = iff(countif(domain == "OptimizadorMezcla" and isAlert == true) > 0, "Alertar", "No Alertar"),
+        Settings = iff(countif(domain == "Settings" and isAlert == true) > 0, "Alertar", "No Alertar");
+
+let legacy_domains =
+legacy_raw
+| project producto="Dispatch", legacy_estado=iff(['NRT Dispatch']=="Alertar","ALERT","OK")
+| union (legacy_raw | project producto="Drillit", legacy_estado=iff(['Drillit']=="Alertar","ALERT","OK"))
+| union (legacy_raw | project producto="Blockgrade", legacy_estado=iff(['Blockgrade']=="Alertar","ALERT","OK"))
+| union (legacy_raw | project producto="PI", legacy_estado=iff(['PI']=="Alertar","ALERT","OK"))
+| union (legacy_raw | project producto="Plans", legacy_estado=iff(['Plans']=="Alertar","ALERT","OK"))
+| union (legacy_raw | project producto="Meteodata", legacy_estado=iff(['Meteo']=="Alertar","ALERT","OK"))
+| union (legacy_raw | project producto="KPI", legacy_estado=iff(['KPIs']=="Alertar","ALERT","OK"))
+| union (legacy_raw | project producto="Alarmas", legacy_estado=iff(['Alarmas']=="Alertar","ALERT","OK"))
+| union (legacy_raw | project producto="Front", legacy_estado=iff(['Front']=="Alertar","ALERT","OK"))
+| union (legacy_raw | project producto="OptimizadorMezcla", legacy_estado=iff(['Optimizador Mezcla']=="Alertar","ALERT","OK"))
+| union (legacy_raw | project producto="Settings", legacy_estado=iff(['Settings']=="Alertar","ALERT","OK"));
+
+// ===== REFACTOR (domain functions) =====
+let refactor_domains = union
+    (fn_prd_mlp_ada_dom_dispatch_status(startTime,endTime)    | project producto="Dispatch",          refactor_estado=status),
+    (fn_prd_mlp_ada_dom_drillit_status(startTime,endTime)     | project producto="Drillit",           refactor_estado=status),
+    (fn_prd_mlp_ada_dom_blockgrade_status(startTime,endTime)  | project producto="Blockgrade",        refactor_estado=status),
+    (fn_prd_mlp_ada_dom_pi_status(startTime,endTime)          | project producto="PI",                refactor_estado=status),
+    (fn_prd_mlp_ada_dom_plans_status(startTime,endTime)       | project producto="Plans",             refactor_estado=status),
+    (fn_prd_mlp_ada_dom_meteodata_status(startTime,endTime)   | project producto="Meteodata",         refactor_estado=status),
+    (fn_prd_mlp_ada_dom_kpi_status(startTime,endTime)         | project producto="KPI",               refactor_estado=status),
+    (fn_prd_mlp_ada_dom_alarm_status(startTime,endTime)       | project producto="Alarmas",           refactor_estado=status),
+    (fn_prd_mlp_ada_dom_front_status(startTime,endTime)       | project producto="Front",             refactor_estado=status),
+    (fn_prd_mlp_ada_dom_optimizador_status(startTime,endTime) | project producto="OptimizadorMezcla", refactor_estado=status),
+    (fn_prd_mlp_ada_dom_settings_status(startTime,endTime)    | project producto="Settings",          refactor_estado=status);
+
+legacy_domains
+| join kind=fullouter refactor_domains on producto
+| extend legacy_estado=coalesce(legacy_estado,"N/A"),
+         refactor_estado=coalesce(refactor_estado,"N/A"),
+         match=legacy_estado==refactor_estado
+| order by producto asc
