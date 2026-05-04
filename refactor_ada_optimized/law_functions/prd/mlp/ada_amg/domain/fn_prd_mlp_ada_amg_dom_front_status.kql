@@ -4,7 +4,7 @@ let fn_prd_mlp_ada_amg_dom_front_status = (startTime:datetime, endTime:datetime)
     | where TimeGenerated between (endTime - 10m .. endTime)
     | where (Level == "Error" and ResultDescription contains "/usr/src/app/app/") or ResultDescription contains "Invalid access token"
     | count
-  ) > 0;
+  ) > 4;
   let status = iff(has_alert, "ALERT", "OK");
   print status
 };
