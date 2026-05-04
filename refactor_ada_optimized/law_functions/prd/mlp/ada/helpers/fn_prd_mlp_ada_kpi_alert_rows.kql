@@ -5,15 +5,7 @@ let fn_prd_mlp_ada_kpi_alert_rows = (startTime:datetime, endTime:datetime) {
     let CurrentTimeChileHour = datetime_part("hour", CurrentTimeChile);
     let CurrentTimeChileMinute = datetime_part("minute", CurrentTimeChile);
 
-    let en_mantencion =
-        toscalar(
-            fn_src_mlp_ws_dataplatform("Logs_MLP_ADA_CL", startTime, endTime)
-            | where product_origin == "DISPATCH_CONDICION_OPERACIONAL"
-            | top 1 by TimeGenerated desc
-            | extend CH1 = tostring(detail["CH-1"]), CH2 = tostring(detail["CH-02"])
-            | extend en_mantencion = iff(trim(" ", tolower(CH1)) != "efectivo" or trim(" ", tolower(CH2)) != "efectivo", true, false)
-            | project en_mantencion
-        );
+    let en_mantencion = toscalar(fn_prd_mlp_ada_en_mantencion(startTime, endTime) | project en_mantencion);
 
     let condicion_1_SinDatosPermanentes = true;
     let condicion_2_0700_a_1000 = CurrentTimeChileHour >= 7 and CurrentTimeChileHour < 10;
@@ -34,19 +26,17 @@ let fn_prd_mlp_ada_kpi_alert_rows = (startTime:datetime, endTime:datetime) {
     let condicion_8_2100_a_2130 = CurrentTimeChileHour >= 21 and CurrentTimeChileHour < 22;
 
     let kpi_catalogs = fn_prd_mlp_ada_kpi_catalogs();
-    let reglas_activas = datatable(regla:string, habilitada:bool)
-    [
-        "EXCLUSION_FIJA", true,
-        "MANTENCION", en_mantencion,
-        "COND_1_SIN_DATOS_PERMANENTES", condicion_1_SinDatosPermanentes,
-        "COND_2_0700_1000", condicion_2_0700_a_1000,
-        "COND_3_1900_2100", condicion_3_1900_a_2100,
-        "COND_4_MIE1900_VIE2100", condicion_4_miercoles_1900_a_viernes_2100,
-        "COND_5_FUERA_HORARIO", condicion_5_fuera_horario_laboral,
-        "COND_6_JUE2100_VIE1030", condicion_6_jueves_2100_a_viernes_1030,
-        "COND_7_0900_0930", condicion_7_0900_a_0930,
-        "COND_8_2100_2130", condicion_8_2100_a_2130
-    ];
+    let reglas_activas = union
+        (print regla="EXCLUSION_FIJA", habilitada=true),
+        (print regla="MANTENCION", habilitada=en_mantencion),
+        (print regla="COND_1_SIN_DATOS_PERMANENTES", habilitada=condicion_1_SinDatosPermanentes),
+        (print regla="COND_2_0700_1000", habilitada=condicion_2_0700_a_1000),
+        (print regla="COND_3_1900_2100", habilitada=condicion_3_1900_a_2100),
+        (print regla="COND_4_MIE1900_VIE2100", habilitada=condicion_4_miercoles_1900_a_viernes_2100),
+        (print regla="COND_5_FUERA_HORARIO", habilitada=condicion_5_fuera_horario_laboral),
+        (print regla="COND_6_JUE2100_VIE1030", habilitada=condicion_6_jueves_2100_a_viernes_1030),
+        (print regla="COND_7_0900_0930", habilitada=condicion_7_0900_a_0930),
+        (print regla="COND_8_2100_2130", habilitada=condicion_8_2100_a_2130);
     let cat_exclusiones_activas =
         kpi_catalogs
         | where tipo == "EXCLUSION"
