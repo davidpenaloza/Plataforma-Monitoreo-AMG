@@ -9,5 +9,5 @@ let fn_prd_mlp_ada_dom_blockgrade_status = (startTime:datetime, endTime:datetime
   let lag = fn_prd_mlp_ada_lag_helpers(dynamic(["blockgrade_bybucket"]), startTime, endTime);
   // Paridad legacy: alerta por ingesta ADF o lag, sin compuerta de mantención.
   let status = iff(not(ing_ok) or lag == "ALERT", "ALERT", "OK");
-  print color = fn_mon_status_to_color(status)
+  print status = status
 };
