@@ -27,5 +27,5 @@ let fn_prd_mlp_ada_dom_dispatch_status = (startTime:datetime, endTime:datetime) 
     | project alerta = is_fail == 1 and next_fail == 1
   );
   let status = iff(lag_classic == "ALERT" or lag_nrt == "ALERT" or consec_fail_job17, "ALERT", "OK");
-  print color = fn_mon_status_to_color(status)
+  print status = status
 };
