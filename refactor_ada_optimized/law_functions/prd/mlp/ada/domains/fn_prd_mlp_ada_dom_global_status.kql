@@ -17,7 +17,11 @@ let fn_prd_mlp_ada_dom_global_status = (startTime:datetime, endTime:datetime) {
       (fn_prd_mlp_ada_dom_alarm_status(startTime,endTime)
       | project Metric='Alarmas', Status=status),
       (fn_prd_mlp_ada_dom_front_status(startTime,endTime)
-      | project Metric='Front', Status=status)
+      | project Metric='Front', Status=status),
+      (fn_prd_mlp_ada_dom_optimizador_status(startTime,endTime)
+      | project Metric='Optimizador Mezcla', Status=status),
+      (fn_prd_mlp_ada_dom_settings_status(startTime,endTime)
+      | project Metric='Settings', Status=status)
     | summarize Status = take_any(Status) by Metric
     | evaluate pivot(Metric, take_any(Status));
   metric_status
@@ -30,10 +34,13 @@ let fn_prd_mlp_ada_dom_global_status = (startTime:datetime, endTime:datetime) {
       Meteodata = iff(column_ifexists('Meteodata', 'OK') == 'ALERT', 'ALERT', 'OK'),
       KPI = iff(column_ifexists('KPI', 'OK') == 'ALERT', 'ALERT', 'OK'),
       Alarmas = iff(column_ifexists('Alarmas', 'OK') == 'ALERT', 'ALERT', 'OK'),
-      Front = iff(column_ifexists('Front', 'OK') == 'ALERT', 'ALERT', 'OK')
+      Front = iff(column_ifexists('Front', 'OK') == 'ALERT', 'ALERT', 'OK'),
+      ['Optimizador Mezcla'] = iff(column_ifexists('Optimizador Mezcla', 'OK') == 'ALERT', 'ALERT', 'OK'),
+      Settings = iff(column_ifexists('Settings', 'OK') == 'ALERT', 'ALERT', 'OK')
   | extend status = iff(
       Dispatch == 'ALERT' or Drillit == 'ALERT' or Blockgrade == 'ALERT' or PI == 'ALERT' or
-      Plans == 'ALERT' or Meteodata == 'ALERT' or KPI == 'ALERT' or Alarmas == 'ALERT' or Front == 'ALERT',
+      Plans == 'ALERT' or Meteodata == 'ALERT' or KPI == 'ALERT' or Alarmas == 'ALERT' or Front == 'ALERT' or
+      ['Optimizador Mezcla'] == 'ALERT' or Settings == 'ALERT',
       'ALERT',
       'OK'
     )
