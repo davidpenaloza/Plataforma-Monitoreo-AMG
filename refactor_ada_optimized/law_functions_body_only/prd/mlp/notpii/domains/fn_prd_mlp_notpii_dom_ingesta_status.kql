@@ -1,4 +1,0 @@
-let fn_prd_mlp_notpii_dom_ingesta_status = (startTime:datetime, endTime:datetime) {
-  fn_prd_mlp_notpii_ingesta_job04_alert(endTime)
-  | project color = iff(Estado == "Alertar", "#E53935", "#EAF4EA")
-};

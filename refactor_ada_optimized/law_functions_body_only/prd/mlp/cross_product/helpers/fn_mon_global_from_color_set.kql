@@ -1,6 +1,0 @@
-  let has_alert = toscalar(
-    print colors = colors
-    | mv-expand c = colors to typeof(string)
-    | summarize has_alert = max(iff(c == alert_color, 1, 0))
-  );
-  iff(coalesce(has_alert, 0) == 1, alert_color, ok_color)

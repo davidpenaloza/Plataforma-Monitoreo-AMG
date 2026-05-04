@@ -1,8 +1,0 @@
-
-  union isfuzzy=true
-    (
-      workspace("/subscriptions/c68213bf-7453-4ba4-9aaa-56b822af4c20/resourceGroups/MLP-PRD-RG-DISPATCH/providers/Microsoft.OperationalInsights/workspaces/mlp-prd-law-dispatch").table("AzureDiagnostics")
-      | where TimeGenerated between (startTime .. endTime)
-      | where sourceType == "AzureDiagnostics"
-      | extend source_table = "AzureDiagnostics"
-    )

@@ -1,8 +1,0 @@
-
-  union isfuzzy=true
-    (
-      workspace("/subscriptions/c68213bf-7453-4ba4-9aaa-56b822af4c20/resourceGroups/MLP-PRD-RG-PLANS/providers/Microsoft.OperationalInsights/workspaces/mlp-prd-law-plans").table("ContainerAppSystemLogs_CL")
-      | where TimeGenerated between (startTime .. endTime)
-      | where sourceType == "ContainerAppSystemLogs_CL"
-      | extend source_table = "ContainerAppSystemLogs_CL"
-    )

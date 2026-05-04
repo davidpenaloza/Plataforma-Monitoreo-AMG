@@ -1,9 +1,0 @@
-let fn_prd_mlp_notpii_dom_global_status = (startTime:datetime, endTime:datetime) {
-  union
-    (fn_prd_mlp_notpii_dom_autoloader_uat_status(startTime, endTime) | project check = "autoloader_uat", estado = iff(color == "#E53935", "ALERT", "OK")),
-    (fn_prd_mlp_notpii_dom_autoloader_dev_status(startTime, endTime) | project check = "autoloader_dev", estado = iff(color == "#E53935", "ALERT", "OK")),
-    (fn_prd_mlp_notpii_dom_ingesta_status(startTime, endTime) | project check = "ingesta", estado = iff(color == "#E53935", "ALERT", "OK"))
-  | summarize estado = take_any(estado) by check
-  | evaluate pivot(check, take_any(estado))
-  | project autoloader_uat = tostring(column_ifexists("autoloader_uat", "OK")), autoloader_dev = tostring(column_ifexists("autoloader_dev", "OK")), ingesta = tostring(column_ifexists("ingesta", "OK"))
-};

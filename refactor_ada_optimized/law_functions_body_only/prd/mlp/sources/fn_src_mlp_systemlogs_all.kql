@@ -1,5 +1,0 @@
-  union
-    (fn_src_mlp_ws_ada("ContainerAppSystemLogs_CL", startTime, endTime) | project TimeGenerated, JobName_s, Log_s),
-    (fn_src_mlp_ws_meteo("ContainerAppSystemLogs_CL", startTime, endTime) | project TimeGenerated, JobName_s, Log_s),
-    (fn_src_mlp_ws_pisystem("ContainerAppSystemLogs_CL", startTime, endTime) | project TimeGenerated, JobName_s, Log_s),
-    (fn_src_mlp_ws_plans("ContainerAppSystemLogs_CL", startTime, endTime) | project TimeGenerated, JobName_s, Log_s)
