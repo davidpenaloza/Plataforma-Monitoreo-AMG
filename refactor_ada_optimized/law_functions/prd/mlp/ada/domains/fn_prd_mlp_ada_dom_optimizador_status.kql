@@ -18,5 +18,5 @@ let fn_prd_mlp_ada_dom_optimizador_status = (startTime:datetime, endTime:datetim
   ) > 0;
   let lag_optimizador = fn_prd_mlp_ada_lag_helpers(dynamic(["optimizador_mezcla"]), startTime, endTime);
   let status = iff(optimizador_run_failed or not(optimizador_job01_ok) or lag_optimizador == "ALERT", "ALERT", "OK");
-  print color = fn_mon_status_to_color(status)
+  print status = status
 };
