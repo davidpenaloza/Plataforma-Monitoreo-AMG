@@ -35,5 +35,5 @@ let fn_prd_mlp_ada_dom_alarm_status = (startTime:datetime, endTime:datetime) {
     | count
   );
   let status = iff(adaJobsAlarmAlert or incidentes_largos_alarmas > 0 or error_conexion_storage > 0, "ALERT", "OK");
-  print color = fn_mon_status_to_color(status)
+  print status = status
 };
