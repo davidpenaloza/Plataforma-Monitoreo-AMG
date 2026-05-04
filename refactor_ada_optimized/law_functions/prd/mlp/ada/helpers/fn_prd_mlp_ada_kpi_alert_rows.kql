@@ -33,6 +33,11 @@ let fn_prd_mlp_ada_kpi_alert_rows = (startTime:datetime, endTime:datetime) {
     let condicion_7_0900_a_0930 = CurrentTimeChileHour >= 9 and CurrentTimeChileHour < 10;
     let condicion_8_2100_a_2130 = CurrentTimeChileHour >= 21 and CurrentTimeChileHour < 22;
 
+    let kpi_catalogs = fn_prd_mlp_ada_kpi_catalogs();
+    let cat_exclusion_fija = kpi_catalogs | where catalog == "EXCLUSION_FIJA" | project KPINoEsperado, ex_fija=true;
+    let cat_exclusion_mantencion = kpi_catalogs | where catalog == "EXCLUSION_MANTENCION" | project KPINoEsperado, ex_mantencion=true;
+    let cat_umbrales = kpi_catalogs | where catalog == "UMBRAL" | project KPINoEsperado, umbral_catalogo=umbral;
+
     fn_src_mlp_ws_ada("ContainerAppConsoleLogs_CL", startTime, endTime)
     | where TimeGenerated between (startTime .. endTime)
     | where ContainerJobName_s startswith "mlp-prd-caj-ada-job" and not(ContainerJobName_s startswith "mlp-prd-caj-ada-job07")
@@ -53,15 +58,20 @@ let fn_prd_mlp_ada_kpi_alert_rows = (startTime:datetime, endTime:datetime) {
     | extend KPINoEsperado = iff(condicion_3_1900_a_2100, iff(KPINoEsperado == "ton_stockpile_proyeccion", "", KPINoEsperado), KPINoEsperado)
     | extend KPINoEsperado = iff(condicion_4_miercoles_1900_a_viernes_2100, iff(KPINoEsperado == "rendimiento_perforacion_plan_dia", "", KPINoEsperado), KPINoEsperado)
     | extend KPINoEsperado = iff(condicion_5_fuera_horario_laboral, iff(KPINoEsperado in ("identify_problematic_zone","metros_perforados_real_dia","numero_perforadoras_operando_real_dia","numero_perforadoras_disponible_real_dia","rendimiento_perforacion_real_dia"), "", KPINoEsperado), KPINoEsperado)
-    | extend KPINoEsperado = iff(en_mantencion == true and KPINoEsperado in ("ley_cu_bg_chancado_real","transporte_stmg_mean","transporte_stmg_std","transporte_stmg_ls","transporte_stmg_li","alimentacion_chancado_std","alimentacion_chancado_ls","alimentacion_chancado_li"), "", KPINoEsperado)
-    | extend KPINoEsperado = iff(KPINoEsperado in ("ejemplo1","transporte_stmg_plan","tk13_flujo_real","metros_perforados_plan_dia","disponibilidad_perforadoras_plan_hora","uebd_perforadoras_plan_hora","ley_cu_bg_stock_real","ley_cu_plan_dia","ley_mo_plan_dia","ley_conc_plan_dia","axb_plan_dia","arsenico_plan_dia","recup_plan_dia","dureza_plan_dia"), "", KPINoEsperado)
+    | join kind=leftouter cat_exclusion_fija on KPINoEsperado
+    | join kind=leftouter cat_exclusion_mantencion on KPINoEsperado
+    | extend KPINoEsperado = iff(en_mantencion == true and coalesce(ex_mantencion, false), "", KPINoEsperado)
+    | extend KPINoEsperado = iff(coalesce(ex_fija, false), "", KPINoEsperado)
+    | project-away ex_fija, ex_mantencion
     | extend KPINoEsperado = iff(trim(" ", KPINoEsperado) == "", "", KPINoEsperado)
     | where KPINoEsperado != ""
     | summarize inicio_problema = min(fecha_log_UTC), ultimo_error = max(fecha_log_UTC) by KPINoEsperado
     | extend minutos_sin_datos = toint(round(datetime_diff("second", now_utc, inicio_problema) / 60.0, 0))
     | extend minutos_desde_ultimo_error = toint(round(datetime_diff("second", now_utc, ultimo_error) / 60.0, 0))
     | extend sigue_caido = minutos_desde_ultimo_error <= 3
-    | extend umbral = iff(KPINoEsperado == "identify_problematic_zone", 30, 20)
+    | join kind=leftouter cat_umbrales on KPINoEsperado
+    | extend umbral = coalesce(umbral_catalogo, 20)
+    | project-away umbral_catalogo
     | where minutos_sin_datos > umbral and sigue_caido == true
     | project KPINoEsperado, minutos_sin_datos, umbral, minutos_desde_ultimo_error;
 };

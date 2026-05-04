@@ -1,0 +1,41 @@
+let fn_prd_mlp_ada_kpi_catalogs = () {
+    union
+    (
+        datatable(catalog:string, KPINoEsperado:string, umbral:int)
+        [
+            "EXCLUSION_FIJA", "ejemplo1", int(null),
+            "EXCLUSION_FIJA", "transporte_stmg_plan", int(null),
+            "EXCLUSION_FIJA", "tk13_flujo_real", int(null),
+            "EXCLUSION_FIJA", "metros_perforados_plan_dia", int(null),
+            "EXCLUSION_FIJA", "disponibilidad_perforadoras_plan_hora", int(null),
+            "EXCLUSION_FIJA", "uebd_perforadoras_plan_hora", int(null),
+            "EXCLUSION_FIJA", "ley_cu_bg_stock_real", int(null),
+            "EXCLUSION_FIJA", "ley_cu_plan_dia", int(null),
+            "EXCLUSION_FIJA", "ley_mo_plan_dia", int(null),
+            "EXCLUSION_FIJA", "ley_conc_plan_dia", int(null),
+            "EXCLUSION_FIJA", "axb_plan_dia", int(null),
+            "EXCLUSION_FIJA", "arsenico_plan_dia", int(null),
+            "EXCLUSION_FIJA", "recup_plan_dia", int(null),
+            "EXCLUSION_FIJA", "dureza_plan_dia", int(null)
+        ]
+    ),
+    (
+        datatable(catalog:string, KPINoEsperado:string, umbral:int)
+        [
+            "EXCLUSION_MANTENCION", "ley_cu_bg_chancado_real", int(null),
+            "EXCLUSION_MANTENCION", "transporte_stmg_mean", int(null),
+            "EXCLUSION_MANTENCION", "transporte_stmg_std", int(null),
+            "EXCLUSION_MANTENCION", "transporte_stmg_ls", int(null),
+            "EXCLUSION_MANTENCION", "transporte_stmg_li", int(null),
+            "EXCLUSION_MANTENCION", "alimentacion_chancado_std", int(null),
+            "EXCLUSION_MANTENCION", "alimentacion_chancado_ls", int(null),
+            "EXCLUSION_MANTENCION", "alimentacion_chancado_li", int(null)
+        ]
+    ),
+    (
+        datatable(catalog:string, KPINoEsperado:string, umbral:int)
+        [
+            "UMBRAL", "identify_problematic_zone", 30
+        ]
+    )
+};
