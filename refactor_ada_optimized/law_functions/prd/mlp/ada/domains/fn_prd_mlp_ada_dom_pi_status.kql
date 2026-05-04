@@ -24,5 +24,5 @@ let fn_prd_mlp_ada_dom_pi_status = (startTime:datetime, endTime:datetime) {
   let job02_alert = iff(expected_job02 == 0, false, real_job02 < ceiling(0.85 * expected_job02));
   let lag = fn_prd_mlp_ada_lag_helpers(dynamic(["pisystem_interpolated"]), startTime, endTime);
   let status = iff(job01_alert or job02_alert or lag == "ALERT", "ALERT", "OK");
-  print color = fn_mon_status_to_color(status)
+  print status = status
 };
