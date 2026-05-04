@@ -50,7 +50,9 @@ let refactor_domains = union
 
 legacy_domains
 | join kind=fullouter refactor_domains on producto
+| extend producto = coalesce(producto, producto1)
 | extend legacy_estado=coalesce(legacy_estado,"N/A"),
          refactor_estado=coalesce(refactor_estado,"N/A"),
          match=legacy_estado==refactor_estado
+| project producto, legacy_estado, refactor_estado, match
 | order by producto asc
