@@ -1,6 +1,7 @@
 // ADA-only helper
 let fn_prd_mlp_ada_lag_helpers = (tables:dynamic, startTime:datetime, endTime:datetime) {
   let lag_thresholds = fn_prd_mlp_ada_lag_thresholds();
+  let default_umbral = toscalar(lag_thresholds | where tabla == "__DEFAULT__" | project umbral_minutos | take 1);
   let t = fn_src_mlp_ws_ada("ContainerAppConsoleLogs_CL", startTime, endTime)
       | where TimeGenerated between (startTime .. endTime)
       | where ContainerGroupName_s startswith "mlp-prd-caj-ada-job02" // filtro temprano por dominio
@@ -13,8 +14,8 @@ let fn_prd_mlp_ada_lag_helpers = (tables:dynamic, startTime:datetime, endTime:da
       | extend ultimo_timestamp = todatetime(substring(mensaje, indexof(mensaje, ": ") + 2, 19))
       | extend ultimo_timestamp = datetime_local_to_utc(ultimo_timestamp, "America/Santiago")
       | extend diff_minutos = round(datetime_diff("second", fecha_log_UTC, ultimo_timestamp) / 60.0, 1)
-      | join kind=leftouter lag_thresholds on tabla
-      | extend umbral = coalesce(umbral_minutos, 0.0)
+      | join kind=leftouter (lag_thresholds | where tabla != "__DEFAULT__") on tabla
+      | extend umbral = coalesce(umbral_minutos, default_umbral)
       | extend alert=iff(isempty(diff_minutos) or diff_minutos > umbral, 1, 0)
       | summarize has_alert=max(alert);
   iff(toscalar(t) == 1, "ALERT", "OK")

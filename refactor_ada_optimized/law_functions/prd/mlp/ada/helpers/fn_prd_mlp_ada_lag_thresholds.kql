@@ -3,6 +3,7 @@
 let fn_prd_mlp_ada_lag_thresholds = () {
   datatable(tabla:string, umbral_minutos:real, comentario:string)
   [
+    "__DEFAULT__", 60, "Fallback seguro para tablas no parametrizadas",
     "pisystem_interpolated", 20, "PI",
     "dispatch_tiempos", 70, "Dispatch NRT",
     "dispatch_shiftdumps", 70, "Dispatch NRT",
