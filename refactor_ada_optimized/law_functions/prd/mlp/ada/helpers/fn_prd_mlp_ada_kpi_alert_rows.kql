@@ -34,9 +34,26 @@ let fn_prd_mlp_ada_kpi_alert_rows = (startTime:datetime, endTime:datetime) {
     let condicion_8_2100_a_2130 = CurrentTimeChileHour >= 21 and CurrentTimeChileHour < 22;
 
     let kpi_catalogs = fn_prd_mlp_ada_kpi_catalogs();
-    let cat_exclusion_fija = kpi_catalogs | where catalog == "EXCLUSION_FIJA" | project KPINoEsperado, ex_fija=true;
-    let cat_exclusion_mantencion = kpi_catalogs | where catalog == "EXCLUSION_MANTENCION" | project KPINoEsperado, ex_mantencion=true;
-    let cat_umbrales = kpi_catalogs | where catalog == "UMBRAL" | project KPINoEsperado, umbral_catalogo=umbral;
+    let reglas_activas = datatable(regla:string, habilitada:bool)
+    [
+        "EXCLUSION_FIJA", true,
+        "MANTENCION", en_mantencion,
+        "COND_1_SIN_DATOS_PERMANENTES", condicion_1_SinDatosPermanentes,
+        "COND_2_0700_1000", condicion_2_0700_a_1000,
+        "COND_3_1900_2100", condicion_3_1900_a_2100,
+        "COND_4_MIE1900_VIE2100", condicion_4_miercoles_1900_a_viernes_2100,
+        "COND_5_FUERA_HORARIO", condicion_5_fuera_horario_laboral,
+        "COND_6_JUE2100_VIE1030", condicion_6_jueves_2100_a_viernes_1030,
+        "COND_7_0900_0930", condicion_7_0900_a_0930,
+        "COND_8_2100_2130", condicion_8_2100_a_2130
+    ];
+    let cat_exclusiones_activas =
+        kpi_catalogs
+        | where tipo == "EXCLUSION"
+        | join kind=inner (reglas_activas | where habilitada == true | project regla) on regla
+        | project KPINoEsperado, excluido=true;
+    let umbral_default = toscalar(kpi_catalogs | where tipo == "UMBRAL" and regla == "DEFAULT" | project umbral | take 1);
+    let cat_umbrales = kpi_catalogs | where tipo == "UMBRAL" and regla == "OVERRIDE" | project KPINoEsperado, umbral_catalogo=umbral;
 
     fn_src_mlp_ws_ada("ContainerAppConsoleLogs_CL", startTime, endTime)
     | where TimeGenerated between (startTime .. endTime)
@@ -50,19 +67,9 @@ let fn_prd_mlp_ada_kpi_alert_rows = (startTime:datetime, endTime:datetime) {
     | where log_nivel == "ERROR"
     | extend root_error_line = tostring(split(traceback, "\n")[3])
     | extend KPINoEsperado = tostring(replace_string(extract(", in (.+)$", 1, root_error_line), "get_", ""))
-    | extend KPINoEsperado = iff(condicion_7_0900_a_0930, iff(KPINoEsperado in ("numero_wheeldozers_operando_real","numero_wheeldozers_disponible_real","numero_wheeldozers_nominal","numero_excavadora_operando_real","numero_excavadora_disponible_real","numero_excavadora_nominal","numero_aljibes_operando_real","numero_aljibes_disponible_real","numero_aljibes_nominal","numero_motoniveladora_operando_real","numero_motoniveladora_disponible_real","numero_motoniveladora_nominal","numero_bulldozer_operando_real","numero_bulldozer_disponible_real","numero_bulldozer_nominal","numero_cargador_frontal_operando_real","numero_cargador_frontal_disponible_real","numero_cargador_frontal_nominal"), "", KPINoEsperado), KPINoEsperado)
-    | extend KPINoEsperado = iff(condicion_8_2100_a_2130, iff(KPINoEsperado in ("numero_wheeldozers_operando_real","numero_wheeldozers_disponible_real","numero_wheeldozers_nominal","numero_excavadora_operando_real","numero_excavadora_disponible_real","numero_excavadora_nominal","numero_aljibes_operando_real","numero_aljibes_disponible_real","numero_aljibes_nominal","numero_motoniveladora_operando_real","numero_motoniveladora_disponible_real","numero_motoniveladora_nominal","numero_bulldozer_operando_real","numero_bulldozer_disponible_real","numero_bulldozer_nominal","numero_cargador_frontal_operando_real","numero_cargador_frontal_disponible_real","numero_cargador_frontal_nominal"), "", KPINoEsperado), KPINoEsperado)
-    | extend KPINoEsperado = iff(condicion_6_jueves_2100_a_viernes_1030, iff(KPINoEsperado in ("ton_stockpile_plan","rendimiento_plan_dia","p80_sag_1_plan","f80_sag_1_plan","rendimiento_sag_1_plan","rendimiento_sag_2_plan","rendimiento_sag_3_plan","rendimiento_sag_4_plan","p80_planta_plan","ley_cobre_plan_dia","recuperacion_plan_dia","transportado_plan_dia","molienda_plan_dia","mo_fino_producido_plan_dia","cu_fino_filtrado_pagable_plan_dia","cu_fino_producido_plan_dia","expit_plan_dia","concentrado_entregado_puerto_plan","concentrado_producido_plan","relave_real_plan","concentrado_colectivo_plan","recuperacion_cu_plan","ley_cu_plan","ley_concentrado_plan","ley_concentrado_mo_plan","recuperacion_selectiva_mo_plan","produccion_selectiva_mo_plan","fase9_plan_completo","fase10_plan_completo","fase11_plan_completo","fase12_plan_completo","remanejo_plan_completo","mov_mina_plan_completo","extraccion_plan_completo","disponibilidad_perforadoras_plan_hora","metros_perforados_plan_dia","uebd_perforadoras_plan_hora"), "", KPINoEsperado), KPINoEsperado)
-    | extend KPINoEsperado = iff(condicion_1_SinDatosPermanentes, iff(KPINoEsperado in ("ley_cu_plan_dia","ley_mo_plan_dia","ley_conc_plan_dia","axb_plan_dia","arsenico_plan_dia","recup_plan_dia","dureza_plan_dia","ley_cu_bg_stock_real","alimentacion_chancado_plan","make_up_plan","identify_problematic_zone"), "", KPINoEsperado), KPINoEsperado)
-    | extend KPINoEsperado = iff(condicion_2_0700_a_1000, iff(KPINoEsperado in ("cu_fino_filtrado_pagable_real_acc_dia","mo_fino_producido_real_acc_dia","mo_fino_producido_proy_dia","cu_fino_producido_proy_dia","cu_fino_filtrado_pagable_proy_dia"), "", KPINoEsperado), KPINoEsperado)
-    | extend KPINoEsperado = iff(condicion_3_1900_a_2100, iff(KPINoEsperado == "ton_stockpile_proyeccion", "", KPINoEsperado), KPINoEsperado)
-    | extend KPINoEsperado = iff(condicion_4_miercoles_1900_a_viernes_2100, iff(KPINoEsperado == "rendimiento_perforacion_plan_dia", "", KPINoEsperado), KPINoEsperado)
-    | extend KPINoEsperado = iff(condicion_5_fuera_horario_laboral, iff(KPINoEsperado in ("identify_problematic_zone","metros_perforados_real_dia","numero_perforadoras_operando_real_dia","numero_perforadoras_disponible_real_dia","rendimiento_perforacion_real_dia"), "", KPINoEsperado), KPINoEsperado)
-    | join kind=leftouter cat_exclusion_fija on KPINoEsperado
-    | join kind=leftouter cat_exclusion_mantencion on KPINoEsperado
-    | extend KPINoEsperado = iff(en_mantencion == true and coalesce(ex_mantencion, false), "", KPINoEsperado)
-    | extend KPINoEsperado = iff(coalesce(ex_fija, false), "", KPINoEsperado)
-    | project-away ex_fija, ex_mantencion
+    | join kind=leftouter cat_exclusiones_activas on KPINoEsperado
+    | extend KPINoEsperado = iff(coalesce(excluido, false), "", KPINoEsperado)
+    | project-away excluido
     | extend KPINoEsperado = iff(trim(" ", KPINoEsperado) == "", "", KPINoEsperado)
     | where KPINoEsperado != ""
     | summarize inicio_problema = min(fecha_log_UTC), ultimo_error = max(fecha_log_UTC) by KPINoEsperado
@@ -70,7 +77,7 @@ let fn_prd_mlp_ada_kpi_alert_rows = (startTime:datetime, endTime:datetime) {
     | extend minutos_desde_ultimo_error = toint(round(datetime_diff("second", now_utc, ultimo_error) / 60.0, 0))
     | extend sigue_caido = minutos_desde_ultimo_error <= 3
     | join kind=leftouter cat_umbrales on KPINoEsperado
-    | extend umbral = coalesce(umbral_catalogo, 20)
+    | extend umbral = coalesce(umbral_catalogo, umbral_default)
     | project-away umbral_catalogo
     | where minutos_sin_datos > umbral and sigue_caido == true
     | project KPINoEsperado, minutos_sin_datos, umbral, minutos_desde_ultimo_error;
