@@ -1,11 +1,3 @@
-  let en_mantencion = toscalar(
-    fn_src_mlp_ws_dataplatform("Logs_MLP_ADA_CL", startTime, endTime)
-    | where product_origin == "DISPATCH_CONDICION_OPERACIONAL"
-    | top 1 by TimeGenerated desc
-    | extend CH1 = tostring(detail["CH-1"]), CH2 = tostring(detail["CH-02"])
-    | extend en_mantencion = iff(trim(" ", tolower(CH1)) != "efectivo" or trim(" ", tolower(CH2)) != "efectivo", true, false)
-    | project en_mantencion
-  );
   let ing_ok = toscalar(
     fn_src_mlp_pipeline_runs_all(startTime - 60m, endTime)
     | where ResourceGroup == "MLP-PRD-RG-BLKGRDE" // filtro temprano por dominio
