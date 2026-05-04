@@ -62,13 +62,7 @@ let fn_prd_mlp_ada_kpi_alert_rows = (startTime:datetime, endTime:datetime) {
     | project-away excluido
     | extend KPINoEsperado = iff(trim(" ", KPINoEsperado) == "", "", KPINoEsperado)
     | where KPINoEsperado != ""
-    | summarize inicio_problema = min(fecha_log_UTC), ultimo_error = max(fecha_log_UTC) by KPINoEsperado
-    | extend minutos_sin_datos = toint(round(datetime_diff("second", now_utc, inicio_problema) / 60.0, 0))
-    | extend minutos_desde_ultimo_error = toint(round(datetime_diff("second", now_utc, ultimo_error) / 60.0, 0))
-    | extend sigue_caido = minutos_desde_ultimo_error <= 3
-    | join kind=leftouter cat_umbrales on KPINoEsperado
-    | extend umbral = coalesce(umbral_catalogo, umbral_default)
-    | project-away umbral_catalogo
-    | where minutos_sin_datos > umbral and sigue_caido == true
-    | project KPINoEsperado, minutos_sin_datos, umbral, minutos_desde_ultimo_error;
+    | summarize ultimo_error = max(fecha_log_UTC) by KPINoEsperado
+    | extend minutos_desde_error = round(datetime_diff("second", endTime, ultimo_error) / 60.0, 2)
+    | project KPINoEsperado, minutos_desde_error;
 };
