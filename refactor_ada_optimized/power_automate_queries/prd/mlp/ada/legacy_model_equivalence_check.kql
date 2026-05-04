@@ -1,24 +1,24 @@
-// Validación operativa interna: refactor (dominios) vs agregado job-level (no usa query legacy original).
-// Uso: smoke check interno. Para equivalencia estricta con legacy usar legacy_model_equivalence_check.kql.
+// Comparación REAL de equivalencia entre modelo legacy y modelo refactor.
+// Reemplazar <LEGACY_RESULT_QUERY> por la query legacy original que retorna una fila
+// con columnas: NRT Dispatch, Drillit, Blockgrade, PI, Plans, Meteo, KPIs, Alarmas, Front, Optimizador Mezcla, Settings.
 let lookback = 24h;
 let startTime = ago(lookback);
 let endTime = now();
 
-// ===== LEGACY (job-level consolidado) =====
 let legacy_raw =
-    fn_prd_mlp_ada_jobs_status_detail(startTime, endTime)
-    | summarize
-        ['NRT Dispatch'] = iff(countif(domain == "NRT Dispatch" and isAlert == true) > 0, "Alertar", "No Alertar"),
-        Drillit = iff(countif(domain == "Drillit" and isAlert == true) > 0, "Alertar", "No Alertar"),
-        Blockgrade = iff(countif(domain == "Blockgrade" and isAlert == true) > 0, "Alertar", "No Alertar"),
-        PI = iff(countif(domain == "PI" and isAlert == true) > 0, "Alertar", "No Alertar"),
-        Plans = iff(countif(domain == "Plans" and isAlert == true) > 0, "Alertar", "No Alertar"),
-        Meteo = iff(countif(domain == "Meteodata" and isAlert == true) > 0, "Alertar", "No Alertar"),
-        KPIs = iff(countif(domain == "KPI" and isAlert == true) > 0, "Alertar", "No Alertar"),
-        Alarmas = iff(countif(domain == "Alarmas" and isAlert == true) > 0, "Alertar", "No Alertar"),
-        Front = iff(countif(domain == "Front" and isAlert == true) > 0, "Alertar", "No Alertar"),
-        ['Optimizador Mezcla'] = iff(countif(domain == "OptimizadorMezcla" and isAlert == true) > 0, "Alertar", "No Alertar"),
-        Settings = iff(countif(domain == "Settings" and isAlert == true) > 0, "Alertar", "No Alertar");
+    (<LEGACY_RESULT_QUERY>)
+    | project
+        ['NRT Dispatch'],
+        Drillit,
+        Blockgrade,
+        PI,
+        Plans,
+        Meteo,
+        KPIs,
+        Alarmas,
+        Front,
+        ['Optimizador Mezcla'],
+        Settings;
 
 let legacy_domains =
 legacy_raw
@@ -34,7 +34,6 @@ legacy_raw
 | union (legacy_raw | project producto="OptimizadorMezcla", legacy_estado=iff(['Optimizador Mezcla']=="Alertar","ALERT","OK"))
 | union (legacy_raw | project producto="Settings", legacy_estado=iff(['Settings']=="Alertar","ALERT","OK"));
 
-// ===== REFACTOR (domain functions) =====
 let refactor_domains = union
     (fn_prd_mlp_ada_dom_dispatch_status(startTime,endTime)    | project producto="Dispatch",          refactor_estado=status),
     (fn_prd_mlp_ada_dom_drillit_status(startTime,endTime)     | project producto="Drillit",           refactor_estado=status),
