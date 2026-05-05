@@ -1,0 +1,74 @@
+let fn_prd_mlp_ada_amg_kpi_alert_rows = (startTime:datetime, endTime:datetime) {
+  let now_utc = now();
+    let CurrentTimeChile = datetime_utc_to_local(now_utc, 'America/Santiago');
+    let CurrentTimeChileWeekDay = dayofweek(CurrentTimeChile) / 1d;
+    let CurrentTimeChileHour = datetime_part("hour", CurrentTimeChile);
+    let CurrentTimeChileMinute = datetime_part("minute", CurrentTimeChile);
+
+    let en_mantencion = toscalar(fn_prd_mlp_ada_en_mantencion(startTime, endTime) | project en_mantencion);
+
+    let condicion_1_SinDatosPermanentes = true;
+    let condicion_2_0700_a_1000 = CurrentTimeChileHour >= 7 and CurrentTimeChileHour < 10;
+    let condicion_3_1900_a_2100 = CurrentTimeChileHour >= 19 and CurrentTimeChileHour < 21;
+    let condicion_4_miercoles_1900_a_viernes_2100 =
+        (CurrentTimeChileWeekDay == 3 and CurrentTimeChileHour >= 19)
+        or (CurrentTimeChileWeekDay == 4)
+        or (CurrentTimeChileWeekDay == 5 and CurrentTimeChileHour < 9);
+    let condicion_5_fuera_horario_laboral =
+        (CurrentTimeChileWeekDay == 6 or CurrentTimeChileWeekDay == 0)
+        or (CurrentTimeChileHour < 9)
+        or (CurrentTimeChileHour >= 19);
+    let condicion_6_jueves_2100_a_viernes_1030 =
+        (CurrentTimeChileWeekDay == 4 and CurrentTimeChileHour >= 21)
+        or (CurrentTimeChileWeekDay == 5 and CurrentTimeChileHour <= 10)
+        or (CurrentTimeChileWeekDay == 5 and CurrentTimeChileHour == 10 and CurrentTimeChileMinute < 30);
+    let condicion_7_0900_a_0930 = CurrentTimeChileHour >= 9 and CurrentTimeChileHour < 10;
+    let condicion_8_2100_a_2130 = CurrentTimeChileHour >= 21 and CurrentTimeChileHour < 22;
+
+    let kpi_catalogs = fn_prd_mlp_ada_amg_kpi_catalogs();
+    let reglas_activas = union
+        (print regla="EXCLUSION_FIJA", habilitada=true),
+        (print regla="MANTENCION", habilitada=en_mantencion),
+        (print regla="COND_1_SIN_DATOS_PERMANENTES", habilitada=condicion_1_SinDatosPermanentes),
+        (print regla="COND_2_0700_1000", habilitada=condicion_2_0700_a_1000),
+        (print regla="COND_3_1900_2100", habilitada=condicion_3_1900_a_2100),
+        (print regla="COND_4_MIE1900_VIE2100", habilitada=condicion_4_miercoles_1900_a_viernes_2100),
+        (print regla="COND_5_FUERA_HORARIO", habilitada=condicion_5_fuera_horario_laboral),
+        (print regla="COND_6_JUE2100_VIE1030", habilitada=condicion_6_jueves_2100_a_viernes_1030),
+        (print regla="COND_7_0900_0930", habilitada=condicion_7_0900_a_0930),
+        (print regla="COND_8_2100_2130", habilitada=condicion_8_2100_a_2130);
+    let cat_exclusiones_activas =
+        kpi_catalogs
+        | where tipo == "EXCLUSION"
+        | join kind=inner (reglas_activas | where habilitada == true | project regla) on regla
+        | project KPINoEsperado, excluido=true;
+    let umbral_default = toscalar(kpi_catalogs | where tipo == "UMBRAL" and regla == "DEFAULT" | project umbral | take 1);
+    let cat_umbrales = kpi_catalogs | where tipo == "UMBRAL" and regla == "OVERRIDE" | project KPINoEsperado, umbral_catalogo=umbral;
+
+    fn_src_mlp_ws_ada("ContainerAppConsoleLogs_CL", startTime, endTime)
+    | where TimeGenerated between (startTime .. endTime)
+    | where ContainerJobName_s startswith "mlp-prd-caj-ada-job" and not(ContainerJobName_s startswith "mlp-prd-caj-ada-job07")
+    | where Log_s startswith '{"fecha_log_UTC":'
+    | project ParsedJson = parse_json(Log_s)
+    | extend
+        fecha_log_UTC = todatetime(ParsedJson.fecha_log_UTC),
+        log_nivel = tostring(ParsedJson.log_nivel),
+        traceback = tostring(ParsedJson.traceback)
+    | where log_nivel == "ERROR"
+    | extend root_error_line = tostring(split(traceback, "\n")[3])
+    | extend KPINoEsperado = tostring(replace_string(extract(", in (.+)$", 1, root_error_line), "get_", ""))
+    | join kind=leftouter cat_exclusiones_activas on KPINoEsperado
+    | extend KPINoEsperado = iff(coalesce(excluido, false), "", KPINoEsperado)
+    | project-away excluido
+    | extend KPINoEsperado = iff(trim(" ", KPINoEsperado) == "", "", KPINoEsperado)
+    | where KPINoEsperado != ""
+    | summarize inicio_problema = min(fecha_log_UTC), ultimo_error = max(fecha_log_UTC) by KPINoEsperado
+    | extend minutos_sin_datos = toint(round(datetime_diff("second", now_utc, inicio_problema) / 60.0, 0))
+    | extend minutos_desde_ultimo_error = toint(round(datetime_diff("second", now_utc, ultimo_error) / 60.0, 0))
+    | extend sigue_caido = minutos_desde_ultimo_error <= 3
+    | join kind=leftouter cat_umbrales on KPINoEsperado
+    | extend umbral = coalesce(umbral_catalogo, umbral_default)
+    | project-away umbral_catalogo
+    | where minutos_sin_datos > umbral and sigue_caido == true
+    | project KPINoEsperado, minutos_sin_datos, umbral, minutos_desde_ultimo_error
+};
