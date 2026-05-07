@@ -1,88 +1,101 @@
 let fn_prd_mlp_ada_jobs_status_detail = (startTime:datetime, endTime:datetime) {
-  let jobsConfig = datatable(jobName:string, jobAlias:string, domain:string, thresholdMinutes:double, frequencyMinutes:int)
-  [
-    "mlp-prd-caj-ada-job01", "job01_transporte_fluidos", "KPIs", 10, 1,
-    "mlp-prd-caj-ada-job02", "job02_indicadores_generales", "KPIs", 10, 1,
-    "mlp-prd-caj-ada-job03", "job03_indicadores_globales", "KPIs", 10, 1,
-    "mlp-prd-caj-ada-job04", "job04_stock_chacay", "KPIs", 10, 1,
-    "mlp-prd-caj-ada-job05", "job05_servicios_mina", "KPIs", 10, 1,
-    "mlp-prd-caj-ada-job06", "job06_alarms-operational-parameters", "Alarmas", 35, 10,
-    "mlp-prd-caj-ada-job07", "job07_alarms-service", "Alarmas", 10, 1,
-    "mlp-prd-caj-ada-job08", "job08_chancado", "KPIs", 10, 1,
-    "mlp-prd-caj-ada-job09", "job09_carguio", "KPIs", 10, 1,
-    "mlp-prd-caj-ada-job10", "job10_flotacion", "KPIs", 10, 1,
-    "mlp-prd-caj-ada-job11", "job11_molienda", "KPIs", 10, 1,
-    "mlp-prd-caj-ada-job12", "job12_puerto", "KPIs", 10, 1,
-    "mlp-prd-caj-ada-job13", "job13_transporte", "KPIs", 10, 1,
-    "mlp-prd-caj-ada-job14", "job14_desaladora", "KPIs", 10, 1,
-    "mlp-prd-caj-ada-job17", "job17_data_dispatch", "NRT Dispatch", 35, 10
-  ];
-  let jobsFlexibles = dynamic(["mlp-prd-caj-ada-job17"]);
-  let maxUmbral = toscalar(jobsConfig | summarize max(thresholdMinutes));
-  let expected =
-    range TimeGeneratedBin_Chile from startTime - totimespan(maxUmbral * 60s) to endTime step 1m
+let jobsConfig = datatable(jobName:string, jobAlias:string, domain:string, thresholdMinutes:double, frequencyMinutes:int)
+[
+    "mlp-prd-caj-ada-job01", "job01_transporte_fluidos",            "KPIs",        10, 1,
+    "mlp-prd-caj-ada-job02", "job02_indicadores_generales",         "KPIs",        10, 1,
+    "mlp-prd-caj-ada-job03", "job03_indicadores_globales",          "KPIs",        10, 1,
+    "mlp-prd-caj-ada-job04", "job04_stock_chacay",                  "KPIs",        10, 1,
+    "mlp-prd-caj-ada-job05", "job05_servicios_mina",                "KPIs",        10, 1,
+    "mlp-prd-caj-ada-job06", "job06_alarms-operational-parameters", "Alarmas",     35, 10,
+    "mlp-prd-caj-ada-job07", "job07_alarms-service",                "Alarmas",     10, 1,
+    "mlp-prd-caj-ada-job08", "job08_chancado",                      "KPIs",        10, 1,
+    "mlp-prd-caj-ada-job09", "job09_carguio",                       "KPIs",        10, 1,
+    "mlp-prd-caj-ada-job10", "job10_flotacion",                     "KPIs",        10, 1,
+    "mlp-prd-caj-ada-job11", "job11_molienda",                      "KPIs",        10, 1,
+    "mlp-prd-caj-ada-job12", "job12_puerto",                        "KPIs",        10, 1,
+    "mlp-prd-caj-ada-job13", "job13_transporte",                    "KPIs",        10, 1,
+    "mlp-prd-caj-ada-job14", "job14_desaladora",                    "KPIs",        10, 1,
+    "mlp-prd-caj-ada-job17", "job17_data_dispatch",                 "NRT Dispatch",35, 10
+];
+let jobsFlexibles = dynamic(["mlp-prd-caj-ada-job17"]);
+let endTimeUTC   = bin(endTime, 1m);
+let startTimeUTC = bin(startTime, 1m);
+let maxUmbral = toscalar(jobsConfig | summarize max(thresholdMinutes));
+let lookback  = totimespan(maxUmbral * 60s);
+// --- expected: clave en UTC ---
+let expected =
+    range t from startTimeUTC - lookback to endTimeUTC step 1m
     | extend JoinKey = 1
     | join kind=inner (jobsConfig | extend JoinKey = 1) on JoinKey
     | project-away JoinKey
     | extend valorEsperado = iff(
         frequencyMinutes == 1,
         1,
-        iff(datetime_part("minute", TimeGeneratedBin_Chile) in (0, 10, 20, 30, 40, 50), 1, 0)
+        iff(datetime_part("minute", datetime_utc_to_local(t, 'America/Santiago')) in (0, 10, 20, 30, 40, 50), 1, 0)
       )
-    | project TimeGeneratedBin_Chile, jobName, jobAlias, domain, thresholdMinutes, valorEsperado;
-  let realRuns =
-    fn_src_mlp_ws_ada("ContainerAppSystemLogs_CL", startTime - totimespan(maxUmbral * 60s), endTime)
-    | where TimeGenerated >= startTime - totimespan(maxUmbral * 60s)
-    | where TimeGenerated < endTime
+    | project TimeGeneratedBin = t, jobName, jobAlias, domain, thresholdMinutes, valorEsperado;
+// --- realRuns: bin en UTC ---
+let realRuns =
+    fn_src_mlp_ws_ada("ContainerAppSystemLogs_CL", startTimeUTC - lookback, endTimeUTC)
     | where JobName_s startswith "mlp-prd-caj-ada-job"
     | where Reason_s == 'Completed'
     | where Log_s contains "has successfully completed"
-    | extend NormalizedTime = iff(JobName_s in (jobsFlexibles), bin(TimeGenerated - 7m, 10m), bin(TimeGenerated, 1m))
-    | summarize valorReal = count() by TimeGeneratedBin_Chile = NormalizedTime, jobName = JobName_s;
-  let expectedVsReal =
+    | extend TimeGeneratedBin = iff(
+        JobName_s in (jobsFlexibles),
+        bin(TimeGenerated - 7m, 10m),   // UTC, flexible jobs
+        bin(TimeGenerated, 1m)           // UTC, resto
+      )
+    | summarize valorReal = count() by TimeGeneratedBin, jobName = JobName_s;
+// --- join: ambos en UTC ---
+let expectedVsReal =
     expected
-    | join kind=leftouter (realRuns) on TimeGeneratedBin_Chile, jobName
+    | join kind=leftouter (realRuns) on TimeGeneratedBin, jobName
     | extend valorReal = coalesce(valorReal, 0);
-  let valoresAcumulados =
+// --- acumulado tolerancia: mv-expand sobre UTC, sin conversión ---
+let valoresAcumulados =
     expectedVsReal
     | extend toleranceRange = range(
-        TimeGeneratedBin_Chile,
-        TimeGeneratedBin_Chile + totimespan(thresholdMinutes * 60s),
+        TimeGeneratedBin,
+        TimeGeneratedBin + totimespan(thresholdMinutes * 60s),
         1m
       )
     | mv-expand toleranceRange to typeof(datetime)
     | summarize
-        valorAccReal = sum(valorReal),
+        valorAccReal     = sum(valorReal),
         valorAccEsperado = sum(valorEsperado)
-      by TimeGeneratedBin_Chile = toleranceRange, jobName
-    | where TimeGeneratedBin_Chile < endTime
+      by TimeGeneratedBin = toleranceRange, jobName
+    | where TimeGeneratedBin < endTimeUTC
     | extend isHardAlert = valorAccReal == 0 and valorAccEsperado != 0;
-  expectedVsReal
-  | where TimeGeneratedBin_Chile >= startTime and TimeGeneratedBin_Chile < endTime
-  | join kind=leftouter (valoresAcumulados | project TimeGeneratedBin_Chile, jobName, isHardAlert) on TimeGeneratedBin_Chile, jobName
-  | extend isHardAlert = coalesce(isHardAlert, false)
-  | summarize
-      expectedCount = sum(valorEsperado),
-      realCount = sum(valorReal),
-      thresholdMinutes = take_any(thresholdMinutes),
-      jobAlias = take_any(jobAlias),
-      domain = take_any(domain),
-      isHardAlert = max(tobool(isHardAlert))
-    by TimeGeneratedBin_Chile = bin(TimeGeneratedBin_Chile, 15m), jobName
-  | extend status = case(
-      isHardAlert, "a",
-      realCount > expectedCount, "s",
-      realCount < ceiling(0.85 * expectedCount), "w",
-      "n"
-    )
-  | extend isAlert = status == "a"
-  | extend expectedVsRealPct = iff(expectedCount == 0, real(null), todouble(realCount) / todouble(expectedCount))
-  | extend reason = case(
-      status == "a", "No real executions within tolerance window",
-      status == "s", "More executions than expected",
-      status == "w", "Real executions below expected threshold",
-      "OK"
-    )
-  | extend statusText = strcat(status, tostring(realCount), "/", tostring(expectedCount))
-  | project TimeGeneratedBin_Chile, jobName, jobAlias, domain, expectedCount, realCount, expectedVsRealPct, thresholdMinutes, status, statusText, isAlert, reason
+// --- resultado final: conversión a Chile solo para display ---
+expectedVsReal
+| where TimeGeneratedBin >= startTimeUTC
+    and TimeGeneratedBin <  endTimeUTC
+| join kind=leftouter (valoresAcumulados | project TimeGeneratedBin, jobName, isHardAlert) on TimeGeneratedBin, jobName
+| extend isHardAlert = coalesce(isHardAlert, false)
+| summarize
+    expectedCount    = sum(valorEsperado),
+    realCount        = sum(valorReal),
+    thresholdMinutes = take_any(thresholdMinutes),
+    jobAlias         = take_any(jobAlias),
+    domain           = take_any(domain),
+    isHardAlert      = max(tobool(isHardAlert))
+  by TimeGeneratedBin = bin(TimeGeneratedBin, 15m), jobName
+| extend status = case(
+    isHardAlert,                               "a",
+    realCount > expectedCount,                 "s",
+    realCount < ceiling(0.85 * expectedCount), "w",
+    "n"
+  )
+| extend isAlert           = status == "a"
+| extend expectedVsRealPct = iff(expectedCount == 0, real(null), todouble(realCount) / todouble(expectedCount))
+| extend reason = case(
+    status == "a", "No real executions within tolerance window",
+    status == "s", "More executions than expected",
+    status == "w", "Real executions below expected threshold",
+    "OK"
+  )
+| extend statusText = strcat(status, tostring(realCount), "/", tostring(expectedCount))
+// ← conversión a Chile solo aquí, al final
+| extend TimeGeneratedBin_Chile = datetime_utc_to_local(TimeGeneratedBin, 'America/Santiago')
+| project TimeGeneratedBin_Chile, jobName, jobAlias, domain, expectedCount, realCount, expectedVsRealPct, thresholdMinutes, status, statusText, isAlert, reason
 };
