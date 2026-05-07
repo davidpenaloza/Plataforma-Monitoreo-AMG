@@ -1,27 +1,23 @@
 let fn_prd_mlp_ada_amg_dom_global_status = (startTime:datetime, endTime:datetime) {
   let metric_status = union
       (fn_prd_mlp_ada_amg_dom_dispatch_status(startTime,endTime)
-      | project Metric='Dispatch', Status=iff(status == "ALERT", "NOOK", "OK")),
+      | project Metric='Dispatch', Status=iff(print_0 == "ALERT", "NOOK", "OK")),
       (fn_prd_mlp_ada_amg_dom_drillit_status(startTime,endTime)
-      | project Metric='Drillit', Status=iff(status == "ALERT", "NOOK", "OK")),
+      | project Metric='Drillit', Status=iff(print_0 == "ALERT", "NOOK", "OK")),
       (fn_prd_mlp_ada_amg_dom_blockgrade_status(startTime,endTime)
-      | project Metric='Blockgrade', Status=iff(status == "ALERT", "NOOK", "OK")),
+      | project Metric='Blockgrade', Status=iff(print_0 == "ALERT", "NOOK", "OK")),
       (fn_prd_mlp_ada_amg_dom_pi_status(startTime,endTime)
-      | project Metric='PI', Status=iff(status == "ALERT", "NOOK", "OK")),
+      | project Metric='PI', Status=iff(print_0 == "ALERT", "NOOK", "OK")),
       (fn_prd_mlp_ada_amg_dom_plans_status(startTime,endTime)
-      | project Metric='Plans', Status=iff(status == "ALERT", "NOOK", "OK")),
+      | project Metric='Plans', Status=iff(print_0 == "ALERT", "NOOK", "OK")),
       (fn_prd_mlp_ada_amg_dom_meteodata_status(startTime,endTime)
-      | project Metric='Meteodata', Status=iff(status == "ALERT", "NOOK", "OK")),
+      | project Metric='Meteodata', Status=iff(print_0 == "ALERT", "NOOK", "OK")),
       (fn_prd_mlp_ada_amg_dom_kpi_status(startTime,endTime)
-      | project Metric='KPI', Status=iff(status == "ALERT", "NOOK", "OK")),
+      | project Metric='KPI', Status=iff(print_0 == "ALERT", "NOOK", "OK")),
       (fn_prd_mlp_ada_amg_dom_alarm_status(startTime,endTime)
-      | project Metric='Alarmas', Status=iff(status == "ALERT", "NOOK", "OK")),
+      | project Metric='Alarmas', Status=iff(print_0 == "ALERT", "NOOK", "OK")),
       (fn_prd_mlp_ada_amg_dom_front_status(startTime,endTime)
-      | project Metric='Front', Status=iff(status == "ALERT", "NOOK", "OK")),
-      (fn_prd_mlp_ada_amg_dom_optimizador_status(startTime,endTime)
-      | project Metric='Optimizador Mezcla', Status=iff(status == "ALERT", "NOOK", "OK")),
-      (fn_prd_mlp_ada_amg_dom_settings_status(startTime,endTime)
-      | project Metric='Settings', Status=iff(status == "ALERT", "NOOK", "OK"))
+      | project Metric='Front', Status=iff(print_0 == "ALERT", "NOOK", "OK"))
     | summarize Status = take_any(Status) by Metric
     | evaluate pivot(Metric, take_any(Status));
   metric_status
@@ -34,13 +30,10 @@ let fn_prd_mlp_ada_amg_dom_global_status = (startTime:datetime, endTime:datetime
       Meteodata = iff(column_ifexists('Meteodata', 'OK') == 'NOOK', 'ALERT', 'OK'),
       KPI = iff(column_ifexists('KPI', 'OK') == 'NOOK', 'ALERT', 'OK'),
       Alarmas = iff(column_ifexists('Alarmas', 'OK') == 'NOOK', 'ALERT', 'OK'),
-      Front = iff(column_ifexists('Front', 'OK') == 'NOOK', 'ALERT', 'OK'),
-      ['Optimizador Mezcla'] = iff(column_ifexists('Optimizador Mezcla', 'OK') == 'NOOK', 'ALERT', 'OK'),
-      Settings = iff(column_ifexists('Settings', 'OK') == 'NOOK', 'ALERT', 'OK')
+      Front = iff(column_ifexists('Front', 'OK') == 'NOOK', 'ALERT', 'OK')
   | extend color = iff(
       Dispatch == 'ALERT' or Drillit == 'ALERT' or Blockgrade == 'ALERT' or PI == 'ALERT' or
-      Plans == 'ALERT' or Meteodata == 'ALERT' or KPI == 'ALERT' or Alarmas == 'ALERT' or Front == 'ALERT' or
-      ['Optimizador Mezcla'] == 'ALERT' or Settings == 'ALERT',
+      Plans == 'ALERT' or Meteodata == 'ALERT' or KPI == 'ALERT' or Alarmas == 'ALERT' or Front == 'ALERT',
       '#E53935',
       '#EAF4EA'
     )

@@ -17,6 +17,10 @@ let fn_prd_mlp_ada_amg_kpi_catalogs = (startTime:datetime, endTime:datetime) {
             "EXCLUSION", "EXCLUSION_FIJA", "arsenico_plan_dia", int(null), "Exclusión manual a pedido",
             "EXCLUSION", "EXCLUSION_FIJA", "recup_plan_dia", int(null), "Exclusión manual a pedido",
             "EXCLUSION", "EXCLUSION_FIJA", "dureza_plan_dia", int(null), "Exclusión manual a pedido",
+            "EXCLUSION", "EXCLUSION_FIJA", "metros_perforados_plan_dia", int(null), "Exclusión manual a pedido",
+            "EXCLUSION", "EXCLUSION_FIJA", "disponibilidad_perforadoras_plan_hora", int(null), "Exclusión manual a pedido",
+            "EXCLUSION", "EXCLUSION_FIJA", "uebd_perforadoras_plan_hora", int(null), "Exclusión manual a pedido",
+
 
             // Mantención
             "EXCLUSION", "MANTENCION", "ley_cu_bg_chancado_real", int(null), "Excluir cuando en_mantencion=true",
