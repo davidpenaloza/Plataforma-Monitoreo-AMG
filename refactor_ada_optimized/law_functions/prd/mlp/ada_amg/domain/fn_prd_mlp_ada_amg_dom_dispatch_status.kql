@@ -7,7 +7,7 @@ let fn_prd_mlp_ada_amg_dom_dispatch_status = (startTime:datetime, endTime:dateti
   let lag_classic = fn_prd_mlp_ada_lag_helpers(dispatch_tables, startTime, endTime);
   let lag_nrt = fn_prd_mlp_ada_alert_from_dispatch_nrt_logs(dispatch_tables, startTime, endTime);
   let consec_fail_job17 = toscalar(
-    range TimeGeneratedBin_Chile from bin(endTime - 30m, 10m) to bin(endTime, 10m) step 10m
+    range TimeGeneratedBin_Chile from bin(endTime - 40m, 10m) to bin(endTime - 10m, 10m) step 10m
     | join kind=leftouter (
       fn_src_mlp_ws_ada("ContainerAppSystemLogs_CL", endTime - 45m, endTime)
       | where JobName_s == "mlp-prd-caj-ada-job17"
