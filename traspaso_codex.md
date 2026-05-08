@@ -1,803 +1,787 @@
-# Traspaso técnico-operativo — Plataforma Monitoreo AMG
+# Traspaso técnico para soporte — Implementación del modelo de funciones en dashboards
 
 ## Resumen ejecutivo
 
-Este documento de traspaso prepara al equipo de soporte para operar, diagnosticar y replicar el modelo de monitoreo de Plataforma Monitoreo AMG. El objetivo práctico es que una persona nueva pueda leer un panel, identificar la variable o wrapper asociado, ejecutar la función KQL correspondiente, validar la fuente de datos y escalar con evidencia.
+Este documento está enfocado exclusivamente en **cómo el equipo de soporte debe implementar, adaptar y consumir el modelo de funciones KQL de este repositorio para construir dashboards de monitoreo**. No es un manual general del repositorio ni un runbook de incidentes; es una guía práctica para entender la arquitectura de funciones, crear nuevas funciones, desplegarlas en Azure Log Analytics Workspace (LAW), consumirlas desde Grafana y replicar el patrón en otros productos.
 
-El repositorio ya contiene una base reutilizable para ADA, ADA AMG, NOTPII y SIROSAG, pero el traspaso debe considerar brechas abiertas: el validador KQL falla actualmente, ADA AMG requiere normalización, no existe procedimiento automatizado de despliegue y los permisos/RBAC no están documentados. Por eso este documento separa estado actual, modelo recomendado, brechas, despliegue, ejercicios y criterios de aceptación.
+El modelo recomendado separa responsabilidades en niveles:
+
+```text
+Source -> Helper -> Domain -> Wrapper Grafana -> Dashboard
+```
+
+Cada nivel tiene un objetivo claro:
+
+- **Source:** leer datos desde workspaces/tablas.
+- **Helper:** encapsular reglas reutilizables o cálculos intermedios.
+- **Domain:** convertir señales técnicas en estado operacional de un dominio.
+- **Wrapper:** adaptar una función para que Grafana la consuma como variable o panel.
+- **Dashboard:** visualizar estado, color, detalle y evidencia.
+
+El equipo de soporte debe aprender a implementar este flujo completo para nuevos productos sin duplicar KQL pesado dentro del JSON de Grafana.
+
+---
 
 ## 1. Objetivo del documento
 
-Este documento transfiere conocimiento al equipo de soporte para que pueda entender, operar, mantener y replicar el modelo de monitoreo contenido en este repositorio.
+El objetivo es transferir al equipo de soporte el conocimiento necesario para:
 
-La meta no es solo saber dónde están los archivos, sino comprender cómo se transforma una señal técnica —logs, jobs, pipelines o tablas— en un estado operativo visible en Grafana o consumible por Power Automate.
+1. Entender los distintos niveles de funciones del modelo.
+2. Saber **dónde se crean** las funciones en el repositorio.
+3. Saber **dónde se despliegan** en LAW.
+4. Saber **cómo se consumen** desde Grafana mediante wrappers.
+5. Saber **cómo adaptar** el modelo a otros productos.
+6. Saber **cómo validar** cada capa antes de usarla en dashboards.
+7. Evitar duplicar lógica en paneles o variables Grafana.
 
-## 2. Público objetivo
+Este documento se debe usar cuando soporte necesite construir o mantener dashboards basados en funciones KQL reutilizables.
 
-| Rol | Uso esperado del documento |
-|---|---|
-| Soporte Nivel 1 | Interpretar estados, validar datos visibles y escalar con contexto. |
-| Soporte Nivel 2 | Diagnosticar queries, fuentes, funciones y falsos positivos. |
-| Analistas | Leer KQL, adaptar consultas y documentar paneles. |
-| Analistas senior | Diseñar nuevas reglas y validar paridad con modelos legacy. |
-| Líderes técnicos | Gobernar estándares, despliegues, revisiones y deuda técnica. |
-| Constructores de dashboards | Crear o mantener paneles operativos reutilizables. |
+---
 
-## 3. Qué debe aprender el equipo de soporte
+## 2. Qué debe dominar soporte para implementar dashboards con funciones
 
-Al finalizar el traspaso, soporte debe poder:
+| Competencia | Qué debe saber soporte | Resultado esperado |
+|---|---|---|
+| Leer estructura del paquete | Ubicar `law_functions`, `grafana_wrappers` y `power_automate_queries`. | Puede encontrar dónde vive cada función. |
+| Crear sources | Encapsular workspace/tabla en una función KQL. | Evita consultas directas repetidas a `workspace()`. |
+| Crear helpers | Reutilizar cálculos de lag, ejecución, desfase o alertas. | Evita duplicar reglas de negocio. |
+| Crear domains | Convertir reglas técnicas en estado de dominio. | Cada dominio tiene una salida clara para dashboard. |
+| Crear wrappers | Adaptar domains/helpers a Grafana. | Variables y paneles consumen KQL liviano. |
+| Validar por capas | Probar source -> helper -> domain -> wrapper. | Se identifica rápido dónde falla. |
+| Documentar trazabilidad | Registrar qué panel usa qué función y fuente. | Soporte puede mantener dashboards en el tiempo. |
 
-- Entender el modelo por capas: source, helper, domain, wrapper y dashboard.
-- Identificar qué fuente alimenta cada dominio monitoreado.
-- Leer una query KQL y reconocer filtros de tiempo, tablas, jobs y umbrales.
-- Interpretar estados `OK`, `ALERT`, `NOOK`, `Alertar` y colores.
-- Usar el dashboard para separar alerta real, falta de datos, problema de permisos o problema visual.
-- Validar si una función está desplegada y devuelve columnas esperadas.
-- Adaptar el patrón a otro producto sin duplicar lógica innecesariamente.
-- Documentar nuevos paneles, fuentes y reglas.
-- Escalar incidentes con evidencia: dominio, fuente, ventana, query y resultado.
+---
 
-## 4. Modelo conceptual de monitoreo
+## 3. Estructura de carpetas relevante para soporte
 
-### 4.1 Qué es monitorear
+La implementación del modelo se concentra en `refactor_ada_optimized/`.
 
-Monitorear es observar señales técnicas y funcionales para tomar decisiones operativas oportunas. En este repositorio, las señales provienen principalmente de Log Analytics Workspaces y se transforman en estados de salud.
-
-### 4.2 Monitoreo técnico, funcional y operativo
-
-| Tipo | Qué observa | Ejemplo en este repositorio | Decisión que habilita |
-|---|---|---|---|
-| Técnico | Logs, jobs, pipelines, tablas, errores | `ContainerAppSystemLogs_CL`, `AzureDiagnostics`, `DatabricksJobs` | Revisar ejecución, permisos, latencia o fallas de infraestructura. |
-| Funcional | Cumplimiento de reglas del producto | Expected-vs-real, lag de tablas, fallas consecutivas | Determinar si un dominio del producto está sano. |
-| Operativo | Estado consolidado para soporte | `GlobalStatus`, colores de Grafana, resumen SIROSAG/NOTPII/ADA | Priorizar atención, escalar y comunicar impacto. |
-
-### 4.3 De datos crudos a indicadores
-
-```mermaid
-flowchart TD
-    A[Logs y tablas crudas] --> B[Source KQL]
-    B --> C[Helper: regla reutilizable]
-    C --> D[Domain: estado por dominio]
-    D --> E[Wrapper Grafana o query Power Automate]
-    E --> F[Panel / flujo / operación]
-    F --> G[Acción de soporte]
+```text
+refactor_ada_optimized/
+├── law_functions/prd/mlp/
+│   ├── sources/
+│   ├── cross_product/helpers/
+│   ├── ada/
+│   │   ├── domains/
+│   │   └── helpers/
+│   ├── ada_amg/
+│   │   └── domain/
+│   ├── notpii/
+│   │   ├── domains/
+│   │   └── helpers/
+│   └── sirosag/
+│       ├── domains/
+│       └── helpers/
+├── grafana_wrappers/prd/mlp/
+│   ├── ada/
+│   ├── ada_amg/
+│   ├── notpii/
+│   └── sirosag/
+└── power_automate_queries/prd/mlp/
+    ├── ada/
+    ├── notpii/
+    └── sirosag/
 ```
 
-### 4.4 Consolidación de estados
+| Carpeta | Qué contiene | Cuándo la usa soporte |
+|---|---|---|
+| `law_functions/prd/mlp/sources` | Funciones que leen workspaces y tablas. | Al conectar un producto a fuentes de datos. |
+| `law_functions/prd/mlp/<producto>/helpers` | Funciones de reglas reutilizables. | Al crear lógica común para varios dominios. |
+| `law_functions/prd/mlp/<producto>/domains` | Funciones de estado final por dominio. | Al definir qué verá el dashboard como OK/ALERT. |
+| `law_functions/prd/mlp/cross_product/helpers` | Helpers transversales, por ejemplo conversión estado-color. | Al estandarizar reglas comunes entre productos. |
+| `grafana_wrappers/prd/mlp/<producto>` | Queries livianas para Grafana. | Al crear variables o paneles en Grafana. |
+| `power_automate_queries/prd/mlp/<producto>` | Queries listas para flujos externos. | Solo si el estado se consume fuera de Grafana. |
 
-Un estado global no debería inventar reglas nuevas: debe consolidar dominios. En ADA, el dominio global consulta dominios como Dispatch, Drillit, Blockgrade, PI, Plans, Meteodata, KPI, Alarmas, Front, Optimizador y Settings, y marca global en alerta si alguno está en `ALERT`.
+> **Nota importante:** ADA AMG aparece en `ada_amg/domain` singular y no `domains`. Esto está documentado como brecha; para implementaciones nuevas se recomienda usar `domains` plural.
 
-## 5. Arquitectura del modelo de monitoreo del repositorio
+---
+
+## 4. Modelo funcional por niveles
+
+### 4.1 Flujo general
 
 ```mermaid
 flowchart LR
-    subgraph Azure[Azure Log Analytics]
-      T1[ContainerAppSystemLogs_CL]
-      T2[ContainerAppConsoleLogs_CL]
-      T3[AppServiceConsoleLogs]
-      T4[AzureDiagnostics]
-      T5[DatabricksJobs]
-      T6[Logs_MLP_ADA_CL]
-    end
-
-    T1 --> S[Sources fn_src_mlp_*]
-    T2 --> S
-    T3 --> S
-    T4 --> S
-    T5 --> S
-    T6 --> S
-
-    S --> H[Helpers de reglas]
-    H --> D[Domains por producto]
-    D --> W[Wrappers var_mlp_*]
-    W --> P[Dashboard Grafana]
-    D --> PA[Power Automate queries]
-    P --> N1[Soporte N1]
-    P --> N2[Soporte N2]
+    A[Workspace / Tabla LAW] --> B[Source]
+    B --> C[Helper]
+    C --> D[Domain]
+    D --> E[Wrapper Grafana]
+    E --> F[Variable o panel]
+    F --> G[Dashboard de soporte]
 ```
 
-### Rol de cada capa
+### 4.2 Responsabilidad de cada nivel
 
-| Capa | Rol | Qué debe revisar soporte |
+| Nivel | Responsabilidad | Qué NO debe hacer |
 |---|---|---|
-| Fuente | Trae datos desde workspace/tabla. | Workspace correcto, tabla existe, columnas esperadas, permisos. |
-| Helper | Aplica regla reusable. | Umbral, ventana, job, tabla, excepciones. |
-| Domain | Devuelve estado funcional. | Qué condiciones disparan `ALERT`. |
-| Wrapper | Adapta la salida a Grafana. | Columna proyectada (`color`, `status` o detalle), macros de tiempo. |
-| Dashboard | Visualiza estado. | Variables, paneles, refresh, tiempo seleccionado. |
-| Power Automate | Automatiza consumo de estado. | Query usada, salida esperada y frecuencia. |
+| Source | Leer datos de una tabla/workspace y filtrar por tiempo. | No debe decidir si hay alerta de negocio. |
+| Helper | Calcular reglas reutilizables: lag, desfase, expected-vs-real, parsing. | No debe estar acoplado a un panel específico. |
+| Domain | Consolidar regla de estado de un dominio: `OK`, `ALERT`, `WARN`. | No debe contener HTML ni lógica visual de Grafana. |
+| Wrapper | Adaptar la salida para Grafana: `color`, `status` o tabla. | No debe duplicar toda la lógica del domain. |
+| Dashboard | Visualizar y ordenar estados. | No debe ser el lugar principal de la lógica KQL pesada. |
 
-## 6. Flujo general de funcionamiento
+---
 
-1. **Nacen los datos:** servicios, jobs, pipelines, Databricks o aplicaciones escriben logs en Azure Log Analytics.
-2. **Se consultan:** una función `fn_src_mlp_ws_*` lee la tabla correspondiente y filtra por ventana de tiempo.
-3. **Se transforman:** helpers calculan lag, expected-vs-real, fallas consecutivas, warnings o errores.
-4. **Se evalúan reglas:** domains convierten señales técnicas en estados como `OK` o `ALERT`.
-5. **Se consolidan:** domains globales unen estados por dominio y determinan estado global.
-6. **Se visualizan:** wrappers alimentan variables o paneles de Grafana.
-7. **Soporte interpreta:** soporte revisa color/estado, baja al detalle, valida fuentes y escala si corresponde.
+## 5. Nivel 1 — Funciones Source
 
-## 7. Componentes que debe dominar soporte
+### 5.1 Qué es una función Source
 
-| Componente | Qué es | Para qué sirve | Qué debe revisar soporte | Errores detectables | Acción sugerida |
-|---|---|---|---|---|---|
-| `Plataforma_Monitoreo_AMG.json` | Dashboard Grafana exportado. | Visualización del monitoreo. | Variables, paneles, datasource, rango de tiempo. | Variables sin datos, panel HTML sin color, datasource incorrecto. | Validar variable en Grafana Explore y revisar wrapper. |
-| `law_functions/prd/mlp/sources` | Capa de acceso a datos. | Encapsula workspaces/tablas. | Workspace, tabla, columnas, permisos. | Tabla inexistente, workspace incorrecto, datos atrasados. | Consultar source directamente con rango corto. |
-| `ada/domains` | Estados de ADA. | Define salud por dominio. | Condición que genera alerta. | Falso positivo por umbral o lag. | Ejecutar domain y helpers relacionados. |
-| `ada/helpers` | Reglas reutilizables ADA. | Evita duplicar lógica. | Umbrales, catálogos, ventanas, excepciones. | Cambio de job, KPI excluido, timezone. | Validar paso a paso. |
-| `ada_amg/domain` | Variante ADA AMG. | Monitoreo ADA AMG. | Estructura y compatibilidad con validador. | Archivo sin `.kql`, wrappers fuera del set requerido. | Regularizar antes de producción formal. |
-| `notpii` | Reglas autoloader/ingesta. | Monitorear NOTPII DEV/UAT e ingesta. | DatabricksJobs y PI System. | Estados `Alertar`, warnings, jobs sin ejecución. | Revisar helper específico. |
-| `sirosag` | Resumen SIROSAG. | Evaluar ejecución, desfase y desactualización. | Job names, ventanas, logs SSAG. | Datos desactualizados o desfase. | Revisar helpers `eval_*`. |
-| `grafana_wrappers` | Entrypoints Grafana. | Simplificar variables. | Función llamada y columna final. | Mismatch `project color` vs salida `status`. | Ajustar contrato o documentar excepción. |
-| Scripts Python | Auditoría estática. | Validación previa a cambios. | Salida de comandos y brechas. | Referencias indefinidas, mirrors faltantes, conflictos. | Corregir o registrar pendiente. |
+Una función **Source** encapsula el acceso a una fuente de datos. En este repositorio suelen llamarse:
 
-## 8. Cómo leer un dashboard de monitoreo
-
-### 8.1 Panel resumen
-
-1. Confirmar el rango de tiempo seleccionado.
-2. Revisar el estado global por producto.
-3. Identificar dominios en rojo o alerta.
-4. No asumir impacto de negocio sin revisar detalle: un `ALERT` puede ser fuente sin datos, job fallido, lag o problema visual.
-
-### 8.2 Bajar al detalle
-
-- Si el global está en alerta, identificar qué dominio lo activó.
-- Ejecutar la variable o wrapper asociada.
-- Si existe detalle tabular (`jobs_detail`), revisar `domain`, `jobName`, `status`, `realCount`, `expectedCount`, `isAlert` y `reason`.
-- Validar si la ventana del dashboard coincide con la ventana de la regla.
-
-### 8.3 Diferenciar alerta real de falso positivo
-
-| Señal | Probable causa | Validación |
-|---|---|---|
-| Dashboard sin datos | Datasource, permisos, rango, variable rota | Probar source directo. |
-| Domain en `ALERT` pero fuente sin filas | Producto no emitió logs o source incorrecto | Consultar workspace/tabla con rango amplio. |
-| Wrapper falla por columna | Contrato salida-wrapper inconsistente | Revisar `project color/status`. |
-| Solo un usuario ve error | Permisos Grafana/Azure | Comparar con usuario con permisos conocidos. |
-| Alerta intermitente | Ventana muy corta, latencia o job tardío | Ampliar rango y revisar expected-vs-real. |
-
-## 9. Cómo interpretar estados, colores y alertas
-
-| Estado/color | Significado observado | Acción soporte |
-|---|---|---|
-| `OK` / `#EAF4EA` | Estado normal o sin condición de alerta detectada. | Mantener observación. |
-| `ALERT` / `#E53935` | Condición de alerta. | Revisar dominio, helper y fuente; escalar si hay impacto. |
-| `WARN` / `WARNING` / `#FFF4CC` | Advertencia potencial. | Revisar tendencia y confirmar si requiere acción. |
-| `NOOK` | Variante usada en ADA AMG para representar no OK. | Tratar como alerta funcional hasta normalizar. |
-| `Alertar` | Estado usado por NOTPII antes de mapear a color. | Revisar autoloader o ingesta correspondiente. |
-| `a`, `w`, `n`, `e` | Estados granulares en helpers/jobs: alerta, warning, normal o error según contexto. | Revisar `statusText`/`reason` y documentación del helper. |
-
-**Pendiente de confirmar:** matriz oficial de severidades de negocio y procedimientos por color. El repositorio muestra estados y colores, pero no define SLA/SLO formal.
-
-## 10. Cómo implementar este modelo en otro producto
-
-1. **Levantar objetivo del producto:** qué debe saber soporte para operar.
-2. **Identificar componentes críticos:** jobs, APIs, pipelines, tablas, app services, Databricks.
-3. **Identificar fuentes:** workspaces, tablas, columnas y permisos.
-4. **Definir reglas:** qué es OK, alerta, warning, ausencia de datos, retraso aceptable.
-5. **Crear sources:** un `fn_src_mlp_ws_*` por workspace o fuente lógica.
-6. **Crear helpers:** lag, ejecución, desfase, catálogos o parsing de logs.
-7. **Crear domains:** una función por dominio y una global.
-8. **Crear wrappers:** una query liviana por variable/panel.
-9. **Crear paneles:** resumen accionable arriba, detalle abajo.
-10. **Validar datos:** probar source → helper → domain → wrapper → panel.
-11. **Documentar:** actualizar README, traspaso, inventario y plantilla de panel.
-12. **Presentar a soporte:** explicar estados, acciones y escalamiento.
-13. **Operar en producción:** revisar falsos positivos, costo y performance.
-
-## 11. Checklist de implementación
-
-| Ítem | Estado |
-|---|---|
-| Producto identificado | ☐ |
-| Objetivo de monitoreo definido | ☐ |
-| Componentes críticos identificados | ☐ |
-| Workspaces identificados | ☐ |
-| Tablas y columnas validadas | ☐ |
-| Permisos validados | ☐ |
-| Sources creados/adaptados | ☐ |
-| Helpers creados/adaptados | ☐ |
-| Domains creados/adaptados | ☐ |
-| Estado global definido | ☐ |
-| Wrappers creados | ☐ |
-| Variables Grafana configuradas | ☐ |
-| Panel resumen creado | ☐ |
-| Panel detalle creado | ☐ |
-| Queries probadas con datos reales | ☐ |
-| Funciones desplegadas en LAW | ☐ |
-| Dashboard importado/probado | ☐ |
-| Alertas/colores validados | ☐ |
-| Power Automate validado, si aplica | ☐ |
-| Documentación actualizada | ☐ |
-| Equipo de soporte capacitado | ☐ |
-| Plan de rollback definido | ☐ |
-
-## 12. Buenas prácticas para soporte
-
-- No duplicar lógica si existe helper o domain reutilizable.
-- Centralizar reglas comunes en KQL, no en HTML del dashboard.
-- Documentar cada panel con objetivo, fuente, interpretación y acción.
-- Mantener nombres claros y trazables.
-- Validar siempre rango de tiempo y timezone.
-- Revisar permisos antes de declarar caída de producto.
-- Evitar queries costosas con ventanas amplias sin necesidad.
-- Separar resumen ejecutivo de detalle diagnóstico.
-- Diseñar paneles accionables: si no guía una acción, cuestionar su valor.
-- Mantener trazabilidad desde alerta hasta fuente.
-- Registrar falsos positivos y ajustar umbrales con aprobación técnica.
-
-## 13. Buenas prácticas de diseño de dashboards
-
-| Práctica | Aplicación recomendada |
-|---|---|
-| Resumen arriba | Mostrar global y dominios principales al inicio. |
-| Detalle abajo | Tablas de jobs, razones y fuentes para diagnóstico. |
-| Colores consistentes | Verde normal, rojo alerta, amarillo warning. |
-| Texto claro | Cada panel debe responder “qué miro” y “qué hago si falla”. |
-| Evitar saturación | No llenar con métricas sin acción asociada. |
-| Variables explícitas | Nombres `var_mlp_<producto>_<dominio>`. |
-| Drill-down | Desde global a dominio, desde dominio a source/helper. |
-| Reutilización | Wrappers livianos para no repetir KQL en paneles. |
-
-## 14. Buenas prácticas de KQL o consultas
-
-- Iniciar por rango de tiempo: `where TimeGenerated between (startTime .. endTime)`.
-- Filtrar por `ResourceGroup`, `JobName_s`, `OperationName` o tabla lo antes posible.
-- Usar sources para esconder workspaces reales.
-- Evitar accesos directos a `workspace()` fuera de `sources`, salvo excepción documentada.
-- Probar cada bloque con `take 10` o `summarize count()` antes de unir.
-- Mantener output estable: si el wrapper proyecta `color`, el domain debe producir `color`.
-- Documentar umbrales y razones de excepciones.
-- Evitar ampliar ventanas sin evaluar costo.
-- Usar `union isfuzzy=true` con cautela y validar datos faltantes.
-- Probar en orden: source → helper → domain → wrapper.
-
-## 15. Diagnóstico operativo
-
-### 15.1 El dashboard no muestra datos
-
-1. Confirmar rango de tiempo.
-2. Confirmar datasource de Grafana.
-3. Ejecutar variable en Grafana Explore.
-4. Ejecutar wrapper equivalente.
-5. Ejecutar domain directo.
-6. Ejecutar source directo.
-7. Revisar permisos del usuario.
-8. Registrar si falta tabla, workspace o columna.
-
-### 15.2 El estado aparece en alerta
-
-1. Identificar dominio exacto.
-2. Revisar regla del domain.
-3. Consultar helper que calcula la condición.
-4. Comparar `real` vs `expected` si aplica.
-5. Revisar últimos logs del job o tabla.
-6. Confirmar si hay mantención o ventana especial.
-7. Escalar al equipo responsable con evidencia.
-
-### 15.3 La query falla
-
-- Revisar si la función existe en LAW.
-- Revisar nombres exactos de columnas.
-- Revisar si el wrapper llama una función definida.
-- Revisar si el archivo tiene extensión `.kql` y fue desplegado.
-- Revisar errores por permisos cross-workspace.
-
-### 15.4 La función no responde o está lenta
-
-- Reducir ventana de tiempo.
-- Probar source de forma aislada.
-- Identificar `union` o `mv-expand` costosos.
-- Revisar cantidad de filas con `summarize count()`.
-- Consultar si hubo aumento de ingesta o cambio de esquema.
-
-### 15.5 Hay diferencia entre usuarios
-
-- Comparar permisos en Grafana.
-- Comparar permisos sobre Log Analytics Workspace.
-- Validar datasource y organización Grafana.
-- Probar con un usuario de referencia.
-
-### 15.6 Hay datos atrasados
-
-- Revisar `max(TimeGenerated)` por tabla.
-- Comparar hora UTC vs hora local.
-- Validar latencia de ingesta.
-- Revisar job/pipeline que produce la tabla.
-
-### 15.7 La alerta parece falsa
-
-- Revisar ventana y refresh.
-- Confirmar si la regla tiene excepciones por mantención/horario.
-- Verificar si una fuente cambió de formato.
-- Registrar evidencia y proponer ajuste de umbral con aprobación.
-
-## 16. Matriz de responsabilidades sugerida
-
-| Rol | Responsabilidades |
-|---|---|
-| Soporte Nivel 1 | Revisar dashboard, registrar alertas, validar rango de tiempo, ejecutar checklist inicial y escalar con evidencia. |
-| Soporte Nivel 2 | Ejecutar wrappers/domains/helpers, diagnosticar fuentes, confirmar falso positivo y proponer corrección operativa. |
-| Líder técnico | Aprobar cambios de reglas, gobernar estándares, revisar PRs y coordinar despliegues. |
-| Equipo de plataforma | Gestionar workspaces, permisos, datasource Grafana, disponibilidad de Log Analytics y costos. |
-| Equipo de desarrollo | Corregir jobs, pipelines, aplicaciones o formatos de logs que originan la alerta. |
-| Dueño del producto | Definir criticidad, ventanas aceptables, reglas funcionales y prioridad de incidentes. |
-
-## 17. Runbook base de operación diaria
-
-1. Abrir dashboard `Plataforma Monitoreo Prod`.
-2. Confirmar rango de tiempo activo.
-3. Revisar estado global de productos.
-4. Revisar dominios en alerta.
-5. Si hay alerta, abrir detalle o ejecutar wrapper/domain.
-6. Validar fuente con rango corto.
-7. Confirmar impacto funcional con dueño del producto si corresponde.
-8. Registrar hallazgo: hora, producto, dominio, query, resultado y acción.
-9. Escalar a N2, plataforma o desarrollo según causa.
-10. Hacer seguimiento hasta normalización.
-11. Cerrar caso con causa raíz o pendiente documentado.
-12. Si fue falso positivo, registrar recomendación de ajuste.
-
-## 18. Plantilla para documentar nuevos paneles
-
-```markdown
-## Panel: <nombre del panel>
-
-- **Producto:** <producto>
-- **Objetivo:** <qué decisión permite tomar>
-- **Fuente de datos:** <workspace / tabla / source>
-- **Query o función asociada:** <wrapper / domain / helper>
-- **Qué representa:** <estado, tendencia, tabla, conteo>
-- **Cómo se interpreta:** <reglas de lectura>
-- **Estados posibles:** <OK / ALERT / WARN / otros>
-- **Acciones ante alerta:** <pasos de soporte>
-- **Responsable funcional:** <rol/equipo>
-- **Responsable técnico:** <rol/equipo>
-- **Ventana de tiempo recomendada:** <rango>
-- **Dependencias:** <jobs, tablas, permisos>
-- **Observaciones:** <pendientes o excepciones>
+```text
+fn_src_mlp_ws_<workspace_logico>
+fn_src_mlp_<agregador>_all
 ```
 
-## 19. Plantilla para documentar nuevos productos monitoreados
+Ejemplos existentes:
 
-```markdown
-# Producto monitoreado: <nombre>
+| Source | Fuente que encapsula | Uso principal |
+|---|---|---|
+| `fn_src_mlp_ws_ada` | Workspace ADA. | Logs ADA, system logs, console logs y front. |
+| `fn_src_mlp_ws_pisystem` | Workspace PI System. | PI, NOTPII ingesta y SIROSAG. |
+| `fn_src_mlp_ws_notpii_databricksjobs` | DatabricksJobs DEV/UAT. | Autoloader NOTPII. |
+| `fn_src_mlp_pipeline_runs_all` | Agregador AzureDiagnostics Dispatch/Drillit/Blockgrade. | Pipelines ADA. |
+| `fn_src_mlp_systemlogs_all` | Agregador system logs ADA/Meteo/PI/Plans. | Dominios ADA. |
+| `fn_src_mlp_ssag_systemlogs_all` | Agregador SIROSAG/Plans/PDMSAGI/PI. | SIROSAG. |
 
-## Objetivo del monitoreo
-<describir objetivo>
+### 5.2 Dónde se crean
 
-## Componentes críticos
-| Componente | Tipo | Criticidad | Señal esperada |
-|---|---|---|---|
+Las funciones source se crean en:
 
-## Fuentes
-| Workspace | Tabla | Source KQL | Columnas clave |
-|---|---|---|---|
-
-## Reglas
-| Dominio | Regla OK | Regla ALERT | Umbral | Ventana |
-|---|---|---|---|---|
-
-## Dashboards y paneles
-| Panel | Wrapper | Interpretación | Acción soporte |
-|---|---|---|---|
-
-## Alertas y escalamiento
-| Condición | Severidad | Escala a | Evidencia requerida |
-|---|---|---|---|
-
-## Consideraciones
-- Pendientes:
-- Riesgos:
-- Supuestos:
+```text
+refactor_ada_optimized/law_functions/prd/mlp/sources/
 ```
 
-## 20. Errores comunes y cómo evitarlos
+### 5.3 Qué debe contener un Source
 
-| Error común | Cómo se ve | Cómo evitarlo |
-|---|---|---|
-| Ruta incorrecta de función | Validador reporta función no definida. | Mantener estructura `prd/mlp/<producto>` y extensión `.kql`. |
-| Query duplicada en JSON | Alto costo y difícil mantenimiento. | Reemplazar por wrapper liviano. |
-| Función no desplegada | Grafana falla aunque el archivo exista. | Verificar despliegue en LAW antes de dashboard. |
-| Workspace incorrecto | No hay datos o hay falsos OK/ALERT. | Encapsular en source y validar catálogo. |
-| Variable mal configurada | Panel queda vacío o sin color. | Confirmar nombre, refresh y columna proyectada. |
-| Falta de permisos | Un usuario ve error y otro no. | Documentar RBAC y probar con usuario soporte. |
-| Ventana mal interpretada | Alerta intermitente o sin sentido. | Revisar `$__timeFrom`, `$__timeTo`, UTC y horario local. |
-| Dashboard sin descripción | Soporte no sabe actuar. | Usar plantilla de panel. |
-| Estados no normalizados | Un panel usa `NOOK`, otro `ALERT`. | Definir catálogo común de estados. |
-| Mirrors/documentación desactualizados | Auditoría contradice docs. | Actualizar docs y scripts junto con cambios. |
+Un source debe tener:
 
-## 21. Recomendaciones finales
+- Nombre claro.
+- Parámetros de tiempo (`startTime`, `endTime`).
+- Parámetro de tabla o tipo (`sourceType` o `tableName`) cuando aplica.
+- Referencia al workspace real.
+- Filtro temprano por `TimeGenerated`.
+- Proyección mínima si se usa como agregador.
 
-- Corregir brechas actuales antes de considerar el modelo listo para traspaso productivo completo.
-- Normalizar salida de domains y wrappers: decidir si el contrato oficial es `status`, `color` o ambos.
-- Incorporar ADA AMG formalmente al validador o separarlo como paquete experimental.
-- Evitar volver a cargar KQL pesado dentro del JSON de Grafana.
-- Crear procedimiento de despliegue de funciones LAW y dashboard.
-- Documentar permisos mínimos por workspace y datasource.
-- Mantener inventario de sources y dependencias actualizado.
-- Agendar revisión periódica de falsos positivos, costos y performance.
-- Capacitar soporte con casos reales: “sin datos”, “alerta real”, “falso positivo” y “error de permisos”.
-- Hacer que cada alerta sea trazable hasta una fuente y una acción concreta.
+Ejemplo conceptual:
 
-## 22. Pendientes identificados para el traspaso
+```kusto
+let fn_src_mlp_ws_producto = (sourceType:string, startTime:datetime, endTime:datetime) {
+  union isfuzzy=true
+    (
+      workspace("<resource-id-law>").table("<tabla>")
+      | where TimeGenerated between (startTime .. endTime)
+      | where sourceType == "<tabla>"
+      | extend source_table = "<tabla>"
+    )
+};
+```
 
-| Pendiente | Prioridad | Motivo |
-|---|---|---|
-| Resolver falla de `validate_kql_references.py` | Alta | El paquete no pasa auditoría estática actual. |
-| Confirmar proceso de despliegue a LAW | Alta | Sin procedimiento, soporte no puede reproducir instalación. |
-| Confirmar datasource y permisos Grafana/Azure | Alta | Requisito para operación diaria. |
-| Normalizar ADA AMG | Media/Alta | Hay estructura y extensiones inconsistentes. |
-| Actualizar JSON para usar wrappers refactorizados | Media | Reduce costo y duplicación. |
-| Crear documentación por panel dentro de Grafana | Media | Facilita lectura operativa. |
-| Definir severidades oficiales y matriz SLA/SLO | Media | Permite priorización consistente. |
+> Ajustar el ejemplo a la tabla real. No inventar workspaces; deben salir del ambiente objetivo.
 
+### 5.4 Cómo validar un Source
 
-## 23. Plan sugerido de capacitación para soporte
+Antes de crear helpers o domains, soporte debe validar el source directamente:
 
-Para que el traspaso sea efectivo, no basta con entregar los archivos. Se recomienda realizar una capacitación práctica en sesiones cortas.
+```kusto
+fn_src_mlp_ws_ada("ContainerAppSystemLogs_CL", ago(30m), now())
+| summarize rows=count(), last=max(TimeGenerated)
+```
 
-| Sesión | Duración sugerida | Objetivo | Actividad práctica | Resultado esperado |
-|---|---:|---|---|---|
-| 1. Contexto y arquitectura | 60 min | Entender capas del modelo y productos cubiertos. | Recorrer `readme_codex.md`, dashboard JSON y carpetas principales. | Soporte puede explicar source → helper → domain → wrapper → dashboard. |
-| 2. Lectura de dashboard | 60 min | Interpretar resumen, detalle, estados y colores. | Simular lectura de `OK`, `ALERT`, sin datos y panel lento. | Soporte distingue alerta real de problema de monitoreo. |
-| 3. Diagnóstico KQL básico | 90 min | Probar queries por capas. | Ejecutar secuencia source → helper → domain → wrapper en un entorno autorizado. | Soporte N2 obtiene evidencia técnica para escalar. |
-| 4. Implementación en otro producto | 90 min | Replicar el patrón sin duplicar lógica. | Completar plantilla de nuevo producto y panel. | Equipo entiende cómo reutilizar el modelo. |
-| 5. Operación y escalamiento | 60 min | Alinear roles, evidencias y comunicación. | Ejecutar runbook con un caso ficticio. | Soporte sabe qué registrar y a quién escalar. |
+Criterios de validación:
 
-**Pendiente de confirmar:** disponibilidad de un entorno seguro para ejecutar KQL durante la capacitación y usuarios con permisos equivalentes a soporte.
-
-## 24. Criterios de aceptación para considerar el traspaso listo
-
-| Criterio | Aceptación mínima | Responsable sugerido |
-|---|---|---|
-| Documentación leída y validada | Soporte confirma que entiende arquitectura, fuentes, estados y runbook. | Líder técnico + Soporte N2 |
-| Dashboard accesible | Usuarios de soporte pueden abrir el dashboard y ver variables sin errores de permisos. | Plataforma/Grafana |
-| Queries críticas probadas | Al menos un source, un helper, un domain y un wrapper por producto probado con datos reales. | Soporte N2 |
-| Validador acordado | `validate_kql_references.py` pasa o sus fallas quedan aceptadas formalmente como pendientes. | Líder técnico |
-| Severidades definidas | Existe criterio oficial para actuar ante rojo/amarillo/verde. | Dueño del producto |
-| Escalamiento validado | Cada dominio crítico tiene equipo responsable y canal de escalamiento. | Soporte + Producto |
-| Rollback documentado | Existe forma de volver a query/panel anterior si una migración falla. | Plataforma + Líder técnico |
-
-## 25. Evidencia mínima para escalar incidentes
-
-Cuando soporte escale un incidente, debe adjuntar evidencia suficiente para evitar reprocesos.
-
-| Dato | Obligatorio | Ejemplo |
-|---|---|---|
-| Producto | Sí | ADA |
-| Dominio | Sí | Dispatch |
-| Estado observado | Sí | `ALERT` / `#E53935` |
-| Hora de detección | Sí | `2026-05-08 14:10 UTC` |
-| Rango consultado | Sí | `now-30m` o fechas absolutas |
-| Panel o variable | Sí | `var_mlp_ada_dispatch` |
-| Función KQL | Sí para N2 | `fn_prd_mlp_ada_dom_dispatch_status` |
-| Source o tabla | Deseable | `fn_src_mlp_ws_ada`, `ContainerAppSystemLogs_CL` |
-| Resultado resumido | Sí | `job17 sin ejecuciones esperadas en 2 intervalos` |
-| Impacto confirmado | Si existe | Usuarios/producto afectado, si fue confirmado por dueño del producto |
-| Acción realizada | Sí | Validado source, escalado a desarrollo |
-
-## 26. Escenarios prácticos de diagnóstico
-
-### 26.1 Escenario A: variable roja en Grafana
-
-1. Identificar variable y dominio.
-2. Ejecutar wrapper con el mismo rango de tiempo.
-3. Ejecutar domain directamente.
-4. Si el domain devuelve alerta, revisar helper o source asociado.
-5. Si el wrapper falla pero el domain funciona, revisar proyección `color/status`.
-6. Registrar evidencia y escalar según matriz.
-
-### 26.2 Escenario B: dashboard vacío
-
-1. Confirmar que el rango no sea demasiado restrictivo.
-2. Validar datasource y permisos del usuario.
-3. Probar una query simple contra el workspace.
-4. Probar source con `summarize count()`.
-5. Si no hay datos, confirmar si el producto dejó de emitir logs o si cambió la tabla.
-6. Escalar a plataforma si es permisos/datasource o a desarrollo si es emisión de logs.
-
-### 26.3 Escenario C: falso positivo recurrente
-
-1. Registrar ocurrencias con fecha, rango y dominio.
-2. Revisar si coincide con ventanas de mantención, horarios especiales o latencia normal.
-3. Comparar `expectedCount` vs `realCount` cuando exista detalle.
-4. Revisar si el umbral es demasiado estricto.
-5. Proponer ajuste documentado y validarlo con dueño del producto.
-6. No modificar reglas sin aprobación.
-
-### 26.4 Escenario D: falla después de adaptar a otro producto
-
-1. Confirmar que los sources apuntan a workspaces del nuevo producto.
-2. Confirmar nombres de tablas y columnas.
-3. Confirmar que los jobs esperados existen con los nombres configurados.
-4. Ejecutar source → helper → domain → wrapper.
-5. Revisar si el validador contempla el nuevo producto.
-6. Actualizar documentación e inventario.
-
-## 27. Paquete mínimo que debe recibir soporte por cada nuevo producto
-
-Cada vez que se replique el modelo en otro producto, soporte debería recibir un paquete documental mínimo:
-
-| Entregable | Contenido mínimo |
+| Validación | Resultado esperado |
 |---|---|
-| Inventario de fuentes | Workspaces, tablas, columnas clave, permisos y responsables. |
-| Inventario de dominios | Regla OK/ALERT, umbral, ventana, helpers y sources. |
-| Dashboard o paneles | Capturas o descripción, variables, datasource y rango recomendado. |
-| Runbook específico | Pasos de diagnóstico por dominio crítico. |
-| Matriz de escalamiento | Responsable técnico, producto, plataforma y canal. |
-| Evidencia de validación | Queries probadas, resultados y fecha de validación. |
-| Pendientes aceptados | Brechas conocidas y plan de cierre. |
-| Rollback | Cómo volver a versión anterior del dashboard/query si falla. |
+| La función existe en LAW. | No devuelve error de función inexistente. |
+| La tabla existe. | No devuelve error de tabla inexistente. |
+| Hay datos recientes. | `rows > 0` o se justifica ausencia por ventana. |
+| `TimeGenerated` está presente. | Permite filtrar por tiempo. |
+| El usuario tiene permisos. | La query no falla por autorización. |
 
-## 28. Cómo mantener viva esta documentación
+---
 
-- Revisar `readme_codex.md` y `traspaso_codex.md` en cada cambio de función, wrapper, dashboard o source.
-- Agregar fecha y responsable en documentos específicos si se crean nuevas guías por producto.
-- No aceptar nuevos paneles sin plantilla de interpretación y acción soporte.
-- Mantener sincronizados inventario, dashboard y scripts de validación.
-- Convertir brechas repetidas en tareas de backlog técnico.
-- Revisar trimestralmente si las reglas siguen representando la operación real.
+## 6. Nivel 2 — Funciones Helper
 
+### 6.1 Qué es un Helper
 
-## 29. Estado actual detectado en el repositorio
+Un **Helper** encapsula lógica reutilizable que puede ser usada por uno o más domains. Ejemplos:
 
-| Elemento | Estado actual | Qué debe saber soporte |
+| Helper | Producto | Qué calcula |
 |---|---|---|
-| Dashboard | Existe `Plataforma_Monitoreo_AMG.json` con resumen y detalle de productos MLP. | Validar que el dashboard importado corresponda a la versión del repositorio. |
-| Modelo KQL | Existe estructura por capas para ADA, NOTPII y SIROSAG; ADA AMG existe con brechas. | Diagnosticar por capas y no asumir que todos los productos tienen la misma madurez. |
-| Validación | `validate_kql_references.py` reporta fallas existentes. | Un fallo del validador no debe ignorarse; debe cerrarse o aceptarse formalmente. |
-| Despliegue | No se identificó pipeline automatizado. | Usar procedimiento manual controlado hasta que exista automatización. |
-| Permisos | RBAC/datasources no están documentados. | Confirmar permisos antes de declarar caída de producto. |
+| `fn_prd_mlp_ada_lag_helpers` | ADA | Lag por tabla según umbrales. |
+| `fn_prd_mlp_ada_alert_from_dispatch_nrt_logs` | ADA | Alertas NRT Dispatch desde logs. |
+| `fn_prd_mlp_ada_jobs_status_detail` | ADA | Diagnóstico expected-vs-real por job. |
+| `fn_prd_mlp_notpii_autoloader_alert` | NOTPII | Estado de jobs Databricks Autoloader. |
+| `fn_prd_mlp_ssag_eval_ejecucion` | SIROSAG | Evaluación de ejecución esperada. |
+| `fn_prd_mlp_ssag_eval_desfase` | SIROSAG | Evaluación de desfase. |
 
-## 30. Modelo recomendado para futuras implementaciones
+### 6.2 Dónde se crean
 
-| Capa | Recomendación para futuros productos | Beneficio para soporte |
+```text
+refactor_ada_optimized/law_functions/prd/mlp/<producto>/helpers/
+```
+
+Para funciones reutilizables entre productos:
+
+```text
+refactor_ada_optimized/law_functions/prd/mlp/cross_product/helpers/
+```
+
+### 6.3 Cuándo crear un Helper
+
+Crear un helper cuando:
+
+- La regla se usará en más de un domain.
+- La lógica es larga o difícil de leer dentro del domain.
+- Se requiere diagnóstico tabular adicional.
+- La regla tiene umbrales, catálogos o excepciones.
+- Se necesita separar lógica técnica de salida visual.
+
+No crear helper si la regla es trivial y solo se usa una vez, salvo que mejore la trazabilidad.
+
+### 6.4 Cómo validar un Helper
+
+Ejecutar el helper con un rango acotado:
+
+```kusto
+fn_prd_mlp_ada_jobs_status_detail(ago(2h), now())
+| take 20
+```
+
+Validar:
+
+| Validación | Qué revisar |
+|---|---|
+| Devuelve columnas esperadas. | `status`, `isAlert`, `reason`, `realCount`, `expectedCount`, si aplica. |
+| No explota el volumen de datos. | Evitar rangos demasiado amplios sin necesidad. |
+| Usa sources correctos. | No debería consultar workspaces directos salvo excepción documentada. |
+| La regla coincide con negocio. | Confirmar umbral, horario, mantención o cadencia. |
+
+---
+
+## 7. Nivel 3 — Funciones Domain
+
+### 7.1 Qué es un Domain
+
+Un **Domain** representa el estado operacional de un dominio monitoreado. Su función es transformar señales técnicas en una salida consumible por dashboard.
+
+Ejemplos:
+
+| Domain | Qué representa |
+|---|---|
+| `fn_prd_mlp_ada_dom_dispatch_status` | Estado Dispatch ADA. |
+| `fn_prd_mlp_ada_dom_pi_status` | Estado PI ADA. |
+| `fn_prd_mlp_ada_dom_global_status` | Estado global ADA. |
+| `fn_prd_mlp_notpii_dom_ingesta_status` | Estado ingesta NOTPII. |
+| `fn_prd_mlp_ssag_dom_resumen_status` | Estado resumen SIROSAG. |
+
+### 7.2 Dónde se crean
+
+```text
+refactor_ada_optimized/law_functions/prd/mlp/<producto>/domains/
+```
+
+Para implementaciones futuras usar siempre `domains` plural. `ada_amg/domain` se considera una brecha de consistencia.
+
+### 7.3 Qué debe hacer un Domain
+
+Un domain debe:
+
+1. Recibir `startTime` y `endTime`.
+2. Llamar helpers o sources necesarios.
+3. Evaluar condiciones de alerta.
+4. Devolver una salida estable para consumo.
+5. Explicar, idealmente, el motivo de la alerta.
+
+### 7.4 Contrato estándar recomendado para funciones Domain
+
+Para nuevas implementaciones, soporte debería solicitar que los domains devuelvan al menos estos campos:
+
+| Campo | Tipo recomendado | Importancia para soporte |
 |---|---|---|
-| Source | Encapsular cada workspace/tabla en `fn_src_mlp_ws_*`. | Soporte sabe dónde validar datos crudos. |
-| Helper | Crear helpers para reglas compartidas y diagnósticos. | Reduce duplicidad y permite explicar alertas. |
-| Domain | Devolver contrato estándar con `domain`, `status`, `color`, `reason`, `severity`, ventana y evidencia. | Soporte puede escalar con contexto. |
-| Wrapper | Mantener wrappers livianos y trazables. | Facilita resolver fallas de panel o variable. |
-| Dashboard | Diseñar resumen ejecutivo + detalle accionable. | Soporte opera sin interpretar queries complejas dentro del panel. |
-| Documentación | Exigir matriz de trazabilidad, runbook y descripción de panel. | El traspaso queda repetible. |
+| `domain` | `string` | Identifica el dominio sin depender del nombre del archivo. |
+| `status` | `string` (`OK`, `ALERT`, `WARN`) | Define si soporte debe actuar. |
+| `color` | `string` hexadecimal | Permite pintar paneles Grafana sin lógica duplicada. |
+| `reason` | `string` | Explica por qué se obtuvo el estado. |
+| `startTime` | `datetime` | Indica desde cuándo se evaluó. |
+| `endTime` | `datetime` | Indica hasta cuándo se evaluó. |
+| `evidence` | `dynamic` o `string` | Entrega conteos, tabla, job, último timestamp o error. |
+| `severity` | `string` (`info`, `warning`, `critical`) | Ayuda a priorizar atención. |
 
-## 31. Brechas que deben cerrarse antes de producción
+Ejemplo conceptual recomendado:
 
-| Brecha | Riesgo | Acción antes de producción |
+```kusto
+let fn_prd_mlp_producto_dom_dominio_status = (startTime:datetime, endTime:datetime) {
+  let has_alert = toscalar(
+    fn_prd_mlp_producto_helper_regla(startTime, endTime)
+    | summarize countif(isAlert == true)
+  ) > 0;
+
+  print
+    domain = "Dominio",
+    status = iff(has_alert, "ALERT", "OK"),
+    color = iff(has_alert, "#E53935", "#EAF4EA"),
+    reason = iff(has_alert, "Se detectó condición de alerta", "Sin alerta detectada"),
+    startTime = startTime,
+    endTime = endTime,
+    evidence = dynamic({"has_alert": has_alert}),
+    severity = iff(has_alert, "critical", "info")
+};
+```
+
+> El repositorio actual no siempre devuelve todos estos campos. Para funciones existentes, validar el contrato real antes de crear wrappers.
+
+### 7.5 Cómo validar un Domain
+
+```kusto
+fn_prd_mlp_ada_dom_dispatch_status(ago(1h), now())
+```
+
+Validar:
+
+| Validación | Resultado esperado |
+|---|---|
+| La función compila. | No hay error de referencias indefinidas. |
+| Devuelve una fila o tabla esperada. | La salida es estable para wrapper/panel. |
+| El estado es interpretable. | `OK`, `ALERT`, `WARN`, `color` o equivalente. |
+| Se puede rastrear la causa. | Existe helper/source para profundizar. |
+
+---
+
+## 8. Nivel 4 — Wrappers Grafana
+
+### 8.1 Qué es un Wrapper
+
+Un wrapper es una query liviana que Grafana consume como variable o panel. Debe llamar una función principal y proyectar la salida esperada.
+
+Ejemplo existente:
+
+```kusto
+fn_prd_mlp_ada_dom_dispatch_status(bin($__timeFrom, 1m), bin($__timeTo, 1m))
+| project color
+| take 1
+```
+
+### 8.2 Dónde se crean
+
+```text
+refactor_ada_optimized/grafana_wrappers/prd/mlp/<producto>/
+```
+
+### 8.3 Tipos de wrappers
+
+| Tipo | Salida | Uso en Grafana |
 |---|---|---|
-| Validador KQL en rojo. | Cambios no confiables o referencias rotas. | Corregir errores o aprobar excepción documentada. |
-| ADA AMG no normalizado. | Wrappers/domains pueden no desplegarse o auditarse correctamente. | Normalizar extensión, carpeta y alcance del validador. |
-| Contrato `status/color` inconsistente. | Paneles con error de columna. | Definir contrato estándar y adaptar wrappers. |
-| Dashboard con KQL legacy pesado. | Mayor costo y complejidad. | Migrar gradualmente a wrappers livianos. |
-| Sin RBAC documentado. | Diagnósticos inconsistentes entre usuarios. | Definir roles mínimos de Grafana y Log Analytics. |
-| Sin rollback formal. | Riesgo al importar dashboard o alterar funciones LAW. | Respaldar dashboard y cuerpos KQL antes de cambios. |
+| Wrapper de color | `color` | Pintar tarjetas, chips o HTML. |
+| Wrapper de status | `status` | Mostrar texto o estado. |
+| Wrapper de detalle | Tabla con varias columnas | Tabla diagnóstica para soporte. |
+| Wrapper global | Estado/color consolidado | Resumen ejecutivo del producto. |
 
-## 32. Matriz de trazabilidad completa
+### 8.4 Reglas para crear wrappers
+
+1. Deben ser pequeños.
+2. Deben llamar una sola función principal cuando sea posible.
+3. Deben usar macros de tiempo de Grafana.
+4. Deben proyectar columnas existentes.
+5. Deben conservar nombres `var_mlp_<producto>_<dominio>.kql`.
+6. No deben reintroducir lógica pesada del dashboard legacy.
+
+### 8.5 Cómo validar un Wrapper
+
+En Grafana Explore o en el plugin de Azure Monitor/Log Analytics:
+
+1. Copiar el contenido del wrapper.
+2. Reemplazar macros si se prueba fuera de Grafana.
+3. Confirmar columna proyectada.
+4. Confirmar que devuelve un solo valor si se usa como variable.
+5. Confirmar que el panel consume el mismo nombre de variable.
+
+Errores comunes:
+
+| Error | Causa probable | Corrección |
+|---|---|---|
+| `Failed to resolve scalar expression named 'color'` | El domain no devuelve `color`. | Ajustar wrapper a `status` o normalizar domain. |
+| Función no encontrada | No se desplegó en LAW o nombre incorrecto. | Desplegar función o corregir llamada. |
+| Sin datos | Rango corto, fuente sin datos o permisos. | Probar source con ventana mayor. |
+| Resultado múltiple en variable | Falta `take 1` o agregación. | Ajustar wrapper para salida escalar. |
+
+---
+
+## 9. Nivel 5 — Consumo en dashboard Grafana
+
+### 9.1 Cómo se consumen los wrappers
+
+Los wrappers se usan como queries de variables o paneles. El patrón recomendado es:
+
+1. Crear o actualizar variable Grafana con nombre `var_mlp_<producto>_<dominio>`.
+2. Pegar el contenido del wrapper.
+3. Configurar datasource Azure Monitor/Log Analytics.
+4. Configurar refresh según necesidad operativa.
+5. Usar el valor en panel HTML/text/stat/table.
+
+### 9.2 Uso típico en paneles
+
+| Salida wrapper | Uso recomendado |
+|---|---|
+| `color` | Fondo o borde de tarjeta visual. |
+| `status` | Texto visible de estado. |
+| `reason` | Tooltip o descripción de panel. |
+| Tabla detalle | Panel table para diagnóstico N2. |
+
+### 9.3 Buenas prácticas visuales
+
+- Panel global arriba.
+- Dominios debajo del global.
+- Detalles técnicos en tabla inferior.
+- Descripción corta en cada panel.
+- No mostrar datos que no generen acción de soporte.
+- Mantener colores consistentes: rojo alerta, verde OK, amarillo warning.
+
+---
+
+## 10. Matriz de trazabilidad para implementar dashboards
 
 | Producto | Panel o variable Grafana | Wrapper | Domain | Helper principal | Source | Workspace/Tabla | Qué valida | Acción de soporte |
 |---|---|---|---|---|---|---|---|---|
-| ADA | `var_mlp_ada_global` | `grafana_wrappers/prd/mlp/ada/var_mlp_ada_global.kql` | `fn_prd_mlp_ada_dom_global_status` | Dominios ADA consolidados | Sources ADA/PI/Plans/Meteo/Dataplatform/Genshare/PRFCI | Múltiples workspaces/tablas | Estado global ADA. | Bajar a dominio específico. |
-| ADA | `var_mlp_ada_dispatch` | `grafana_wrappers/prd/mlp/ada/var_mlp_ada_dispatch.kql` | `fn_prd_mlp_ada_dom_dispatch_status` | `fn_prd_mlp_ada_lag_helpers`, `fn_prd_mlp_ada_alert_from_dispatch_nrt_logs` | `fn_src_mlp_ws_ada` | `mlp-prd-law-ada / ContainerAppSystemLogs_CL, ContainerAppConsoleLogs_CL` | Lag Dispatch, NRT y job17. | Revisar job17 y tablas Dispatch. |
-| ADA | `var_mlp_ada_drillit` | `grafana_wrappers/prd/mlp/ada/var_mlp_ada_drillit.kql` | `fn_prd_mlp_ada_dom_drillit_status` | `fn_prd_mlp_ada_lag_helpers` | `fn_src_mlp_pipeline_runs_all`, `fn_src_mlp_ws_ada` | `mlp-prd-law-drillit / AzureDiagnostics`; ADA tablas Drillit | Pipeline y lag Drillit. | Revisar pipeline y tablas `drillit_*`. |
-| ADA | `var_mlp_ada_blockgrade` | `grafana_wrappers/prd/mlp/ada/var_mlp_ada_blockgrade.kql` | `fn_prd_mlp_ada_dom_blockgrade_status` | `fn_prd_mlp_ada_lag_helpers`, `fn_prd_mlp_ada_en_mantencion` | `fn_src_mlp_pipeline_runs_all`, `fn_src_mlp_ws_dataplatform` | `mlp-prd-law-blkgrde / AzureDiagnostics`; `ams-dev-dataplatform-laws / Logs_MLP_ADA_CL` | Blockgrade y mantención. | Confirmar mantención y pipeline. |
-| ADA | `var_mlp_ada_pi` | `grafana_wrappers/prd/mlp/ada/var_mlp_ada_pi.kql` | `fn_prd_mlp_ada_dom_pi_status` | `fn_prd_mlp_ada_lag_helpers` | `fn_src_mlp_systemlogs_all` | `mlp-prd-law-pisystem / ContainerAppSystemLogs_CL` | PI expected-vs-real y lag. | Revisar jobs PI y frescura. |
-| ADA | `var_mlp_ada_plans` | `grafana_wrappers/prd/mlp/ada/var_mlp_ada_plans.kql` | `fn_prd_mlp_ada_dom_plans_status` | `fn_prd_mlp_ada_lag_helpers` | `fn_src_mlp_systemlogs_all`, `fn_src_mlp_ws_plans` | `mlp-prd-law-plans / ContainerAppSystemLogs_CL` | Plans y tablas `planes_*`. | Revisar jobs/lag Plans. |
-| ADA | `var_mlp_ada_meteodata` | `grafana_wrappers/prd/mlp/ada/var_mlp_ada_meteodata.kql` | `fn_prd_mlp_ada_dom_meteodata_status` | `fn_prd_mlp_ada_lag_helpers` | `fn_src_mlp_systemlogs_all`, `fn_src_mlp_ws_meteo` | `mlp-prd-law-meteo / ContainerAppSystemLogs_CL` | Jobs meteo y lag. | Revisar logs Meteo. |
-| ADA | `var_mlp_ada_kpi` | `grafana_wrappers/prd/mlp/ada/var_mlp_ada_kpi.kql` | `fn_prd_mlp_ada_dom_kpi_status` | `fn_prd_mlp_ada_jobs_status_detail`, `fn_prd_mlp_ada_kpi_alert_rows` | `fn_src_mlp_ws_ada`, `fn_src_mlp_ws_dataplatform` | ADA logs; `Logs_MLP_ADA_CL` | Jobs KPI y KPIs no esperados. | Revisar detalle KPI y excepciones. |
-| ADA | `var_mlp_ada_alarm` | `grafana_wrappers/prd/mlp/ada/var_mlp_ada_alarm.kql` | `fn_prd_mlp_ada_dom_alarm_status` | `fn_prd_mlp_ada_jobs_status_detail` | `fn_src_mlp_ws_ada` | `mlp-prd-law-ada / ContainerAppConsoleLogs_CL` | Alarmas, incidentes largos, storage. | Revisar job06/job07 y errores. |
-| ADA | `var_mlp_ada_front` | `grafana_wrappers/prd/mlp/ada/var_mlp_ada_front.kql` | `fn_prd_mlp_ada_dom_front_status` | No identificado en el repositorio | `fn_src_mlp_ws_ada` | `mlp-prd-law-ada / AppServiceConsoleLogs` | Errores Front/token. | Revisar app logs y autenticación. |
-| ADA | `var_mlp_ada_jobs_detail` | `grafana_wrappers/prd/mlp/ada/var_mlp_ada_jobs_detail.kql` | No aplica | `fn_prd_mlp_ada_jobs_status_detail` | `fn_src_mlp_ws_ada` | `ContainerAppSystemLogs_CL` | Diagnóstico por job. | Usar para soporte N2. |
+| ADA | `var_mlp_ada_global` | `grafana_wrappers/prd/mlp/ada/var_mlp_ada_global.kql` | `fn_prd_mlp_ada_dom_global_status` | Dominios ADA consolidados | Sources ADA/PI/Plans/Meteo/Dataplatform/Genshare/PRFCI | Múltiples workspaces/tablas | Estado global ADA. | Bajar al dominio en alerta. |
+| ADA | `var_mlp_ada_dispatch` | `grafana_wrappers/prd/mlp/ada/var_mlp_ada_dispatch.kql` | `fn_prd_mlp_ada_dom_dispatch_status` | `fn_prd_mlp_ada_lag_helpers`, `fn_prd_mlp_ada_alert_from_dispatch_nrt_logs` | `fn_src_mlp_ws_ada` | `mlp-prd-law-ada / ContainerAppSystemLogs_CL, ContainerAppConsoleLogs_CL` | Lag Dispatch, NRT y fallas job17. | Revisar job17 y tablas Dispatch. |
+| ADA | `var_mlp_ada_jobs_detail` | `grafana_wrappers/prd/mlp/ada/var_mlp_ada_jobs_detail.kql` | No aplica | `fn_prd_mlp_ada_jobs_status_detail` | `fn_src_mlp_ws_ada` | `mlp-prd-law-ada / ContainerAppSystemLogs_CL` | Detalle por job. | Usar para diagnóstico N2. |
 | ADA AMG | `var_mlp_ada_amg_*` | `grafana_wrappers/prd/mlp/ada_amg/*.kql` | `fn_prd_mlp_ada_amg_dom_*_status` | Pendiente de confirmar por dominio | Sources ADA compartidos | Pendiente de confirmar por dominio | Monitoreo ADA AMG. | Normalizar antes de producción. |
 | NOTPII | `var_mlp_notpii_autoloader_dev` | `grafana_wrappers/prd/mlp/notpii/var_mlp_notpii_autoloader_dev.kql` | `fn_prd_mlp_notpii_dom_autoloader_dev_status` | `fn_prd_mlp_notpii_autoloader_alert` | `fn_src_mlp_ws_notpii_databricksjobs` | `ams-dev-dataplatform-laws / DatabricksJobs` | Autoloader DEV. | Revisar jobs Databricks DEV. |
 | NOTPII | `var_mlp_notpii_autoloader_uat` | `grafana_wrappers/prd/mlp/notpii/var_mlp_notpii_autoloader_uat.kql` | `fn_prd_mlp_notpii_dom_autoloader_uat_status` | `fn_prd_mlp_notpii_autoloader_alert` | `fn_src_mlp_ws_notpii_databricksjobs` | `ams-uat-dataplatform-laws / DatabricksJobs` | Autoloader UAT. | Revisar jobs Databricks UAT. |
-| NOTPII | `var_mlp_notpii_ingesta` | `grafana_wrappers/prd/mlp/notpii/var_mlp_notpii_ingesta.kql` | `fn_prd_mlp_notpii_dom_ingesta_status` | `fn_prd_mlp_notpii_ingesta_job04_alert` | `fn_src_mlp_ws_pisystem` | `mlp-prd-law-pisystem / ContainerApp*` | Ingesta job04. | Revisar warnings/errores PI System. |
+| NOTPII | `var_mlp_notpii_ingesta` | `grafana_wrappers/prd/mlp/notpii/var_mlp_notpii_ingesta.kql` | `fn_prd_mlp_notpii_dom_ingesta_status` | `fn_prd_mlp_notpii_ingesta_job04_alert` | `fn_src_mlp_ws_pisystem` | `mlp-prd-law-pisystem / ContainerAppSystemLogs_CL, ContainerAppConsoleLogs_CL` | Ingesta job04. | Revisar warnings/errores PI System. |
 | NOTPII | `var_mlp_notpii_difusion_global` | `grafana_wrappers/prd/mlp/notpii/var_mlp_notpii_difusion_global.kql` | `fn_prd_mlp_notpii_dom_global_status` | Dominios NOTPII | Sources NOTPII/PI | DatabricksJobs y PI logs | Global NOTPII. | Bajar a autoloader o ingesta. |
-| SIROSAG | `var_mlp_sirosag_resumen` | `grafana_wrappers/prd/mlp/sirosag/var_mlp_sirosag_resumen.kql` | `fn_prd_mlp_ssag_dom_resumen_status` | `fn_prd_mlp_ssag_eval_ejecucion`, `fn_prd_mlp_ssag_eval_desfase`, `fn_prd_mlp_ssag_eval_desactualizacion` | `fn_src_mlp_ws_ssag`, `fn_src_mlp_ssag_systemlogs_all` | SSAG, Plans, PDMSAGI, PISystem logs | Ejecución, desfase y desactualización. | Revisar helper SIROSAG específico. |
+| SIROSAG | `var_mlp_sirosag_resumen` | `grafana_wrappers/prd/mlp/sirosag/var_mlp_sirosag_resumen.kql` | `fn_prd_mlp_ssag_dom_resumen_status` | `fn_prd_mlp_ssag_eval_ejecucion`, `fn_prd_mlp_ssag_eval_desfase`, `fn_prd_mlp_ssag_eval_desactualizacion` | `fn_src_mlp_ws_ssag`, `fn_src_mlp_ssag_systemlogs_all` | SSAG/Plans/PDMSAGI/PISystem logs | Ejecución, desfase y desactualización. | Revisar helper SIROSAG específico. |
 
-## 33. Procedimiento real de despliegue
+---
 
-### 33.1 Prevalidación del repositorio
+## 11. Procedimiento para implementar el modelo en un nuevo dashboard
 
-1. Revisar `git status` y confirmar alcance.
-2. Ejecutar `check_conflict_markers.py`.
-3. Ejecutar `validate_kql_references.py`.
-4. Ejecutar `analyze_source_catalog.py` si cambian sources.
-5. Registrar brechas aceptadas antes de continuar.
+### 11.1 Paso 1 — Levantar fuentes del producto
 
-### 33.2 Orden de despliegue de funciones LAW
+Identificar:
 
-1. Sources.
-2. Helpers cross-product.
-3. Helpers de producto.
-4. Domains de producto.
-5. Queries Power Automate o consumidores externos.
-6. Dashboard Grafana.
+- Workspaces LAW.
+- Tablas.
+- Columnas clave.
+- Jobs o pipelines.
+- Cadencias esperadas.
+- Umbrales de alerta.
 
-### 33.3 Validación de sources
+Plantilla:
 
-- Probar cada source con rango corto.
-- Confirmar conteo de filas y `max(TimeGenerated)`.
-- Confirmar workspace/tabla correcta.
+| Fuente | Workspace | Tabla | Columna de tiempo | Columnas clave | Responsable |
+|---|---|---|---|---|---|
+| Pendiente de confirmar | Pendiente de confirmar | Pendiente de confirmar | `TimeGenerated` | Pendiente de confirmar | Pendiente de confirmar |
 
-### 33.4 Validación de helpers
+### 11.2 Paso 2 — Crear sources
 
-- Ejecutar helper con datos reales.
-- Confirmar columnas de diagnóstico.
-- Validar umbrales y excepciones.
+Crear un archivo por source en:
 
-### 33.5 Validación de domains
+```text
+refactor_ada_optimized/law_functions/prd/mlp/sources/
+```
 
-- Ejecutar domain individual.
-- Confirmar `status/color/reason` o contrato actual.
-- Confirmar que global coincide con dominios individuales.
+Nombre recomendado:
 
-### 33.6 Validación de wrappers
+```text
+fn_src_mlp_ws_<producto_o_workspace>.kql
+```
 
-- Ejecutar wrapper en Grafana Explore.
-- Confirmar macro de tiempo y columna proyectada.
-- Si falla, comparar salida del domain.
+Validar source antes de avanzar.
 
-### 33.7 Importación o actualización del dashboard en Grafana
+### 11.3 Paso 3 — Crear helpers
 
-- Respaldar dashboard actual.
-- Importar o actualizar JSON.
-- Confirmar datasource y UID.
-- Confirmar permisos de visualización para soporte.
+Crear helpers en:
 
-### 33.8 Validación de variables
+```text
+refactor_ada_optimized/law_functions/prd/mlp/<producto>/helpers/
+```
 
-- Ejecutar variables globales y por dominio.
-- Confirmar formato `color/status` esperado.
-- Verificar refresh y rango de tiempo.
+Crear helpers para:
 
-### 33.9 Validación de paneles
+- Lag de tablas.
+- Expected-vs-real de jobs.
+- Parsing de logs.
+- Catálogos de excepciones.
+- Reglas compartidas por varios dominios.
 
-- Revisar panel resumen y detalle.
-- Confirmar render de colores.
-- Confirmar que cada alerta tenga ruta de diagnóstico.
+### 11.4 Paso 4 — Crear domains
 
-### 33.10 Pruebas antes de producción
+Crear domains en:
 
-- Probar `now-30m` y `now-6h`.
-- Validar un flujo completo por producto: source → helper → domain → wrapper → panel.
+```text
+refactor_ada_optimized/law_functions/prd/mlp/<producto>/domains/
+```
+
+Un domain por cada componente visual importante del dashboard.
+
+Ejemplo:
+
+```text
+fn_prd_mlp_<producto>_dom_<dominio>_status.kql
+```
+
+### 11.5 Paso 5 — Crear wrapper Grafana
+
+Crear wrapper en:
+
+```text
+refactor_ada_optimized/grafana_wrappers/prd/mlp/<producto>/
+```
+
+Nombre recomendado:
+
+```text
+var_mlp_<producto>_<dominio>.kql
+```
+
+### 11.6 Paso 6 — Crear variable o panel en Grafana
+
+En Grafana:
+
+1. Crear variable con el mismo nombre lógico del wrapper.
+2. Pegar query wrapper.
+3. Seleccionar datasource correcto.
+4. Confirmar refresh.
+5. Usar variable en panel.
+
+### 11.7 Paso 7 — Documentar trazabilidad
+
+Agregar una fila a la matriz:
+
+```text
+Producto | Panel/variable | Wrapper | Domain | Helper | Source | Workspace/Tabla | Qué valida | Acción
+```
+
+---
+
+## 12. Orden de despliegue recomendado
+
+El orden importa porque cada capa depende de la anterior.
+
+```mermaid
+flowchart TD
+    A[1 Sources] --> B[2 Helpers cross-product]
+    B --> C[3 Helpers producto]
+    C --> D[4 Domains]
+    D --> E[5 Wrappers Grafana]
+    E --> F[6 Variables Grafana]
+    F --> G[7 Paneles Dashboard]
+```
+
+### 12.1 Prevalidación del repositorio
+
+Ejecutar:
+
+```bash
+python refactor_ada_optimized/check_conflict_markers.py
+python refactor_ada_optimized/validate_kql_references.py
+```
+
+Si `validate_kql_references.py` falla por brechas conocidas, registrar aceptación formal antes de continuar.
+
+### 12.2 Despliegue de funciones LAW
+
+Orden:
+
+1. `sources`.
+2. `cross_product/helpers`.
+3. `<producto>/helpers`.
+4. `<producto>/domains`.
+
+> El repositorio no incluye un script de despliegue LAW. El método real de creación/alteración de funciones en LAW queda **Pendiente de confirmar** por el equipo responsable de Azure/Plataforma.
+
+### 12.3 Validación de sources
+
+```kusto
+<source>(<tabla>, ago(30m), now())
+| summarize rows=count(), last=max(TimeGenerated)
+```
+
+### 12.4 Validación de helpers
+
+```kusto
+<helper>(ago(1h), now())
+| take 20
+```
+
+Ajustar parámetros según firma real del helper.
+
+### 12.5 Validación de domains
+
+```kusto
+<domain>(ago(1h), now())
+```
+
+Confirmar salida y contrato.
+
+### 12.6 Validación de wrappers
+
+- Ejecutar wrapper en Grafana.
+- Confirmar que proyecta columna existente.
+- Confirmar que devuelve el formato esperado para variable/panel.
+
+### 12.7 Importación o actualización del dashboard en Grafana
+
+1. Respaldar dashboard actual.
+2. Importar o actualizar JSON.
+3. Validar datasource.
+4. Validar variables.
+5. Validar paneles.
+
+### 12.8 Pruebas antes de producción
+
+- Probar al menos un flujo completo por producto.
 - Comparar con modelo legacy si existe.
-- Obtener aprobación del líder técnico y soporte.
+- Confirmar que soporte puede diagnosticar desde panel hasta source.
 
-### 33.11 Rollback o reversa
+### 12.9 Rollback o reversa
 
 - Restaurar dashboard respaldado.
-- Revertir wrapper o función LAW a versión anterior.
-- Mantener copia de cuerpos KQL críticos.
-- Documentar causa, impacto y siguiente acción.
+- Revertir wrapper.
+- Revertir función LAW al cuerpo anterior.
+- Registrar causa del rollback.
 
-## 34. Criterios de aceptación del traspaso
+---
 
-### 34.1 Criterios técnicos
+## 13. Checklist de implementación para soporte
 
-- Sources, helpers, domains y wrappers críticos fueron probados.
-- El validador está correcto o sus fallas están aceptadas formalmente.
-- El dashboard renderiza variables sin errores críticos.
-- Existe rollback documentado.
+| Ítem | Estado |
+|---|---|
+| Producto identificado. | ☐ |
+| Workspaces identificados. | ☐ |
+| Tablas validadas. | ☐ |
+| Sources creados. | ☐ |
+| Sources desplegados en LAW. | ☐ |
+| Sources probados con datos reales. | ☐ |
+| Helpers creados. | ☐ |
+| Helpers desplegados. | ☐ |
+| Helpers probados. | ☐ |
+| Domains creados. | ☐ |
+| Domains desplegados. | ☐ |
+| Contrato de salida validado. | ☐ |
+| Wrappers creados. | ☐ |
+| Wrappers probados en Grafana. | ☐ |
+| Variables Grafana creadas. | ☐ |
+| Paneles creados o actualizados. | ☐ |
+| Trazabilidad documentada. | ☐ |
+| Rollback preparado. | ☐ |
 
-### 34.2 Criterios operativos
+---
 
-- Soporte sabe leer global, dominio y detalle.
-- Soporte puede diferenciar falla real, falso positivo, permisos y falta de datos.
-- Hay matriz de escalamiento o responsables pendientes identificados.
-- El runbook fue ejercitado al menos una vez.
+## 14. Ejercicios prácticos enfocados en implementación
 
-### 34.3 Criterios de documentación
-
-- Matriz de trazabilidad completa disponible.
-- Brechas y pendientes priorizados.
-- Plantillas de panel y producto disponibles.
-- Descripciones de panel listas para Grafana.
-
-### 34.4 Criterios de capacitación
-
-- Equipo completó ejercicios prácticos.
-- Soporte N1 entiende interpretación visual.
-- Soporte N2 entiende diagnóstico KQL por capas.
-- Dudas pendientes quedaron registradas.
-
-## 35. Ejercicios prácticos para capacitar al equipo
-
-### 35.1 Dashboard sin datos
+### 14.1 Crear y consumir un Source
 
 | Campo | Detalle |
 |---|---|
-| Objetivo | Diagnosticar panel vacío sin asumir caída de producto. |
-| Contexto | El dashboard no muestra datos en uno o más paneles. |
-| Pasos | Validar rango, datasource, variable, wrapper, source y permisos. |
-| Resultado esperado | Identificar si el problema es rango, Grafana, permisos, source o emisión de logs. |
-| Aprendizaje | Un panel vacío requiere diagnóstico por capas. |
+| Objetivo | Aprender a encapsular una tabla en una función source y validarla. |
+| Contexto | Nuevo producto requiere leer una tabla de Log Analytics. |
+| Pasos | 1) Identificar workspace/tabla. 2) Crear `fn_src_mlp_ws_<producto>`. 3) Desplegar en LAW. 4) Ejecutar `summarize count()`. |
+| Resultado esperado | Source devuelve filas o justifica ausencia de datos. |
+| Aprendizaje | Toda lógica posterior depende de una fuente correctamente encapsulada. |
 
-### 35.2 Estado global en alerta
-
-| Campo | Detalle |
-|---|---|
-| Objetivo | Bajar desde estado global hasta dominio/fuente. |
-| Contexto | ADA, NOTPII o SIROSAG aparece en alerta global. |
-| Pasos | Ejecutar global, identificar dominio, ejecutar domain/helper/source y registrar evidencia. |
-| Resultado esperado | Dominio causante y fuente probable identificados. |
-| Aprendizaje | El global prioriza; no reemplaza el diagnóstico. |
-
-### 35.3 Wrapper con error de columna
+### 14.2 Crear un Helper de lag
 
 | Campo | Detalle |
 |---|---|
-| Objetivo | Reconocer mismatch entre wrapper y salida del domain. |
-| Contexto | Wrapper proyecta `color`, pero el domain devuelve `status`. |
-| Pasos | Ejecutar domain, revisar columnas, comparar con wrapper y documentar ajuste. |
-| Resultado esperado | Error aislado en contrato wrapper/domain. |
-| Aprendizaje | Los contratos de salida deben ser estables. |
+| Objetivo | Crear una regla reutilizable de frescura de datos. |
+| Contexto | Una tabla no debe atrasarse más de N minutos. |
+| Pasos | 1) Usar source. 2) Calcular `max(TimeGenerated)`. 3) Comparar con `now()`. 4) Devolver `isAlert` y `reason`. |
+| Resultado esperado | Helper indica si la tabla está desactualizada. |
+| Aprendizaje | El helper concentra reglas repetibles para varios domains. |
 
-### 35.4 Usuario sin permisos
-
-| Campo | Detalle |
-|---|---|
-| Objetivo | Separar incidente de permisos de incidente del producto. |
-| Contexto | Un usuario ve error y otro ve datos. |
-| Pasos | Comparar usuarios, validar datasource, validar acceso LAW y escalar a plataforma. |
-| Resultado esperado | Problema RBAC confirmado o descartado. |
-| Aprendizaje | Los permisos son parte del monitoreo operativo. |
-
-### 35.5 Alerta falsa por ventana de tiempo
+### 14.3 Crear un Domain con contrato estándar
 
 | Campo | Detalle |
 |---|---|
-| Objetivo | Evaluar impacto del rango temporal y latencia. |
-| Contexto | Un dominio alerta en ventana corta y normaliza en ventana mayor. |
-| Pasos | Probar `now-15m`, `now-6h`, revisar cadencia, expected-vs-real y umbrales. |
-| Resultado esperado | Falso positivo identificado y documentado. |
-| Aprendizaje | La ventana de tiempo debe alinearse con cadencias reales. |
+| Objetivo | Transformar una regla técnica en estado operacional. |
+| Contexto | El dashboard necesita mostrar estado de un dominio. |
+| Pasos | 1) Llamar helper. 2) Definir `status`. 3) Definir `color`. 4) Agregar `reason`, ventana y evidencia. |
+| Resultado esperado | Domain devuelve una fila estable para Grafana. |
+| Aprendizaje | El domain es el contrato entre lógica KQL y dashboard. |
 
-## 36. Contrato estándar recomendado para funciones domain
+### 14.4 Crear un Wrapper con error de columna
 
-| Campo | Por qué es importante para soporte |
+| Campo | Detalle |
 |---|---|
-| `domain` | Permite identificar el dominio operativo en tablas globales y reportes. |
-| `status` | Define la decisión principal: normal, alerta o advertencia. |
-| `color` | Permite render visual directo en Grafana sin lógica duplicada. |
-| `reason` | Explica causa de estado y reduce tiempo de diagnóstico. |
-| `startTime` | Deja explícita la ventana evaluada. |
-| `endTime` | Permite reproducir la evaluación. |
-| `evidence` | Entrega datos de respaldo: job, conteos, tabla, timestamp o error. |
-| `severity` | Permite priorizar atención y escalar correctamente. |
+| Objetivo | Aprender a detectar errores entre wrapper y domain. |
+| Contexto | El wrapper proyecta `color`, pero el domain solo devuelve `status`. |
+| Pasos | 1) Ejecutar domain. 2) Revisar columnas. 3) Ejecutar wrapper. 4) Corregir wrapper o normalizar domain. |
+| Resultado esperado | Se identifica y corrige el mismatch. |
+| Aprendizaje | Los wrappers deben proyectar columnas reales. |
 
-## 37. Ruta recomendada de lectura para una persona nueva
+### 14.5 Crear una variable Grafana
 
-1. Leer el resumen ejecutivo de este documento.
-2. Leer el resumen ejecutivo de `readme_codex.md`.
-3. Revisar matriz de trazabilidad completa.
-4. Revisar estado actual, modelo recomendado y brechas.
-5. Leer procedimiento real de despliegue.
-6. Ejecutar ejercicios prácticos con un mentor.
-7. Revisar anexos de comandos y descripciones de panel.
+| Campo | Detalle |
+|---|---|
+| Objetivo | Consumir un wrapper desde Grafana. |
+| Contexto | Se creó `var_mlp_producto_dominio.kql`. |
+| Pasos | 1) Crear variable en Grafana. 2) Pegar wrapper. 3) Seleccionar datasource. 4) Validar valor. 5) Usar variable en panel. |
+| Resultado esperado | Panel muestra estado/color del domain. |
+| Aprendizaje | Grafana debe consumir wrappers, no lógica pesada duplicada. |
 
-## 38. Anexo con comandos de validación
+---
+
+## 15. Errores comunes al implementar funciones para dashboards
+
+| Error | Síntoma | Prevención |
+|---|---|---|
+| Crear lógica directa en Grafana. | JSON grande y difícil de mantener. | Mover lógica a helpers/domains. |
+| No crear source. | Workspaces repetidos en muchas queries. | Encapsular acceso en `fn_src_mlp_ws_*`. |
+| Wrapper apunta a columna inexistente. | Error `Failed to resolve scalar expression`. | Validar salida del domain antes del wrapper. |
+| Domain no explica motivo. | Soporte ve alerta pero no sabe causa. | Agregar `reason` y `evidence`. |
+| No validar por capas. | Diagnóstico lento. | Probar source -> helper -> domain -> wrapper. |
+| No documentar matriz. | Nadie sabe qué panel usa qué función. | Actualizar trazabilidad al crear panel. |
+
+---
+
+## 16. Anexo — Comandos de validación para implementar funciones
 
 | Comando | Qué valida | Qué hacer si falla |
 |---|---|---|
-| `python refactor_ada_optimized/validate_kql_references.py` | Referencias KQL, wrappers, funciones requeridas, mirrors body-only y layout. | Corregir errores o registrar aceptación formal de brecha. |
-| `python refactor_ada_optimized/check_conflict_markers.py` | Marcadores de conflicto Git. | Resolver conflictos antes de PR/despliegue. |
-| `python refactor_ada_optimized/analyze_source_catalog.py` | Catálogo de sources, consumidores y workspaces. | Revisar impacto y actualizar documentación de fuentes; si devuelve `0` sources, validar alcance/ruta esperada por el script. |
-| `python refactor_ada_optimized/resolve_required_resources.py <function_name>` | Recursos requeridos por una función específica. | Ejecutar con un nombre real; si falla, confirmar definición KQL y extensión `.kql`. |
+| `python refactor_ada_optimized/validate_kql_references.py` | Referencias KQL, wrappers, funciones requeridas y layout esperado. | Corregir errores o registrar brecha aceptada. Actualmente falla por brechas conocidas. |
+| `python refactor_ada_optimized/check_conflict_markers.py` | Marcadores de conflicto Git. | Resolver conflictos antes de desplegar. |
+| `python refactor_ada_optimized/analyze_source_catalog.py` | Catálogo de sources y consumidores según el script. | Si devuelve `0` sources, revisar alcance/ruta esperada antes de usarlo como inventario real. |
+| `python refactor_ada_optimized/resolve_required_resources.py <function_name>` | Workspaces requeridos por una función. | Ejecutar con nombre real; si falla, revisar que la función exista y tenga extensión `.kql`. |
 
-## 39. Anexo con descripciones breves listas para pegar en paneles de Grafana
+---
 
-| Panel/variable | Descripción breve sugerida |
+## 17. Anexo — Descripciones listas para pegar en paneles de Grafana
+
+| Panel/variable | Descripción sugerida |
 |---|---|
-| ADA Global | Estado global ADA. Si está en alerta, revisar dominios ADA y bajar a detalle. |
-| ADA Dispatch | Valida lag Dispatch, señal NRT y job17. Revisar logs ADA y tablas Dispatch ante alerta. |
-| ADA Drillit | Valida pipeline y frescura Drillit. Revisar AzureDiagnostics y tablas `drillit_*`. |
-| ADA Blockgrade | Valida pipeline, lag y mantención Blockgrade. Confirmar condición operacional. |
-| ADA PI | Valida ejecución y frescura PI. Revisar jobs PI y `pisystem_interpolated`. |
-| ADA Plans | Valida ejecución y frescura de planes. Revisar logs Plans y tablas `planes_*`. |
-| ADA KPI | Valida jobs KPI y KPIs no esperados. Revisar detalle y excepciones. |
-| ADA Alarmas | Valida jobs de alarmas, incidentes largos y storage. Revisar job06/job07. |
-| ADA Front | Valida errores de aplicación/token. Revisar `AppServiceConsoleLogs`. |
-| NOTPII Autoloader | Valida jobs Databricks DEV/UAT. Revisar failed/running/cancelled. |
-| NOTPII Ingesta | Valida job04 PI System. Revisar errores, warnings y ejecución. |
-| SIROSAG Resumen | Valida ejecución, desfase y desactualización. Revisar helpers SIROSAG. |
+| ADA Global | Estado global ADA consolidado desde domains. Si está en alerta, revisar el dominio específico asociado. |
+| ADA Dispatch | Valida lag Dispatch, señal NRT y fallas del job17. Revisar logs ADA y tablas Dispatch ante alerta. |
+| ADA Jobs Detail | Tabla de diagnóstico expected-vs-real por job ADA. Usar para identificar jobs faltantes o atrasados. |
+| NOTPII Autoloader DEV | Estado de jobs Databricks Autoloader DEV. Revisar ejecuciones failed/running/cancelled. |
+| NOTPII Autoloader UAT | Estado de jobs Databricks Autoloader UAT. Revisar ejecuciones failed/running/cancelled. |
+| NOTPII Ingesta | Estado de ingesta PI System job04. Revisar errores, warnings o ausencia de ejecución. |
+| SIROSAG Resumen | Estado resumen SIROSAG basado en ejecución, desfase y desactualización. Revisar helpers SIROSAG ante alerta. |
+
+---
+
+## 18. Ruta recomendada de lectura para soporte implementador
+
+1. Leer secciones 3 y 4 para entender carpetas y niveles.
+2. Leer secciones 5 a 8 para aprender sources, helpers, domains y wrappers.
+3. Revisar sección 10 para entender trazabilidad.
+4. Seguir sección 11 para implementar en un nuevo dashboard.
+5. Usar sección 12 como orden de despliegue.
+6. Completar checklist de sección 13.
+7. Ejecutar ejercicios de sección 14.
+8. Usar anexos para validar y documentar paneles.
+
+---
+
+## 19. Criterios de aceptación para soporte
+
+| Criterio | Aceptación |
+|---|---|
+| Soporte puede explicar los cinco niveles. | Source, helper, domain, wrapper y dashboard. |
+| Soporte puede crear un source simple. | Función desplegada y validada con datos. |
+| Soporte puede crear o adaptar un wrapper. | Variable Grafana devuelve valor esperado. |
+| Soporte puede validar por capas. | Identifica si falla source, helper, domain o wrapper. |
+| Soporte documenta trazabilidad. | Cada panel nuevo tiene fila en la matriz. |
+| Soporte evita KQL pesado en dashboard. | Lógica vive en funciones LAW y wrappers livianos. |
