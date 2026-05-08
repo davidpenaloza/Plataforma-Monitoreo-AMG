@@ -427,3 +427,109 @@ flowchart LR
 | Crear documentación por panel dentro de Grafana | Media | Facilita lectura operativa. |
 | Definir severidades oficiales y matriz SLA/SLO | Media | Permite priorización consistente. |
 
+
+## 23. Plan sugerido de capacitación para soporte
+
+Para que el traspaso sea efectivo, no basta con entregar los archivos. Se recomienda realizar una capacitación práctica en sesiones cortas.
+
+| Sesión | Duración sugerida | Objetivo | Actividad práctica | Resultado esperado |
+|---|---:|---|---|---|
+| 1. Contexto y arquitectura | 60 min | Entender capas del modelo y productos cubiertos. | Recorrer `readme_codex.md`, dashboard JSON y carpetas principales. | Soporte puede explicar source → helper → domain → wrapper → dashboard. |
+| 2. Lectura de dashboard | 60 min | Interpretar resumen, detalle, estados y colores. | Simular lectura de `OK`, `ALERT`, sin datos y panel lento. | Soporte distingue alerta real de problema de monitoreo. |
+| 3. Diagnóstico KQL básico | 90 min | Probar queries por capas. | Ejecutar secuencia source → helper → domain → wrapper en un entorno autorizado. | Soporte N2 obtiene evidencia técnica para escalar. |
+| 4. Implementación en otro producto | 90 min | Replicar el patrón sin duplicar lógica. | Completar plantilla de nuevo producto y panel. | Equipo entiende cómo reutilizar el modelo. |
+| 5. Operación y escalamiento | 60 min | Alinear roles, evidencias y comunicación. | Ejecutar runbook con un caso ficticio. | Soporte sabe qué registrar y a quién escalar. |
+
+**Pendiente de confirmar:** disponibilidad de un entorno seguro para ejecutar KQL durante la capacitación y usuarios con permisos equivalentes a soporte.
+
+## 24. Criterios de aceptación para considerar el traspaso listo
+
+| Criterio | Aceptación mínima | Responsable sugerido |
+|---|---|---|
+| Documentación leída y validada | Soporte confirma que entiende arquitectura, fuentes, estados y runbook. | Líder técnico + Soporte N2 |
+| Dashboard accesible | Usuarios de soporte pueden abrir el dashboard y ver variables sin errores de permisos. | Plataforma/Grafana |
+| Queries críticas probadas | Al menos un source, un helper, un domain y un wrapper por producto probado con datos reales. | Soporte N2 |
+| Validador acordado | `validate_kql_references.py` pasa o sus fallas quedan aceptadas formalmente como pendientes. | Líder técnico |
+| Severidades definidas | Existe criterio oficial para actuar ante rojo/amarillo/verde. | Dueño del producto |
+| Escalamiento validado | Cada dominio crítico tiene equipo responsable y canal de escalamiento. | Soporte + Producto |
+| Rollback documentado | Existe forma de volver a query/panel anterior si una migración falla. | Plataforma + Líder técnico |
+
+## 25. Evidencia mínima para escalar incidentes
+
+Cuando soporte escale un incidente, debe adjuntar evidencia suficiente para evitar reprocesos.
+
+| Dato | Obligatorio | Ejemplo |
+|---|---|---|
+| Producto | Sí | ADA |
+| Dominio | Sí | Dispatch |
+| Estado observado | Sí | `ALERT` / `#E53935` |
+| Hora de detección | Sí | `2026-05-08 14:10 UTC` |
+| Rango consultado | Sí | `now-30m` o fechas absolutas |
+| Panel o variable | Sí | `var_mlp_ada_dispatch` |
+| Función KQL | Sí para N2 | `fn_prd_mlp_ada_dom_dispatch_status` |
+| Source o tabla | Deseable | `fn_src_mlp_ws_ada`, `ContainerAppSystemLogs_CL` |
+| Resultado resumido | Sí | `job17 sin ejecuciones esperadas en 2 intervalos` |
+| Impacto confirmado | Si existe | Usuarios/producto afectado, si fue confirmado por dueño del producto |
+| Acción realizada | Sí | Validado source, escalado a desarrollo |
+
+## 26. Escenarios prácticos de diagnóstico
+
+### 26.1 Escenario A: variable roja en Grafana
+
+1. Identificar variable y dominio.
+2. Ejecutar wrapper con el mismo rango de tiempo.
+3. Ejecutar domain directamente.
+4. Si el domain devuelve alerta, revisar helper o source asociado.
+5. Si el wrapper falla pero el domain funciona, revisar proyección `color/status`.
+6. Registrar evidencia y escalar según matriz.
+
+### 26.2 Escenario B: dashboard vacío
+
+1. Confirmar que el rango no sea demasiado restrictivo.
+2. Validar datasource y permisos del usuario.
+3. Probar una query simple contra el workspace.
+4. Probar source con `summarize count()`.
+5. Si no hay datos, confirmar si el producto dejó de emitir logs o si cambió la tabla.
+6. Escalar a plataforma si es permisos/datasource o a desarrollo si es emisión de logs.
+
+### 26.3 Escenario C: falso positivo recurrente
+
+1. Registrar ocurrencias con fecha, rango y dominio.
+2. Revisar si coincide con ventanas de mantención, horarios especiales o latencia normal.
+3. Comparar `expectedCount` vs `realCount` cuando exista detalle.
+4. Revisar si el umbral es demasiado estricto.
+5. Proponer ajuste documentado y validarlo con dueño del producto.
+6. No modificar reglas sin aprobación.
+
+### 26.4 Escenario D: falla después de adaptar a otro producto
+
+1. Confirmar que los sources apuntan a workspaces del nuevo producto.
+2. Confirmar nombres de tablas y columnas.
+3. Confirmar que los jobs esperados existen con los nombres configurados.
+4. Ejecutar source → helper → domain → wrapper.
+5. Revisar si el validador contempla el nuevo producto.
+6. Actualizar documentación e inventario.
+
+## 27. Paquete mínimo que debe recibir soporte por cada nuevo producto
+
+Cada vez que se replique el modelo en otro producto, soporte debería recibir un paquete documental mínimo:
+
+| Entregable | Contenido mínimo |
+|---|---|
+| Inventario de fuentes | Workspaces, tablas, columnas clave, permisos y responsables. |
+| Inventario de dominios | Regla OK/ALERT, umbral, ventana, helpers y sources. |
+| Dashboard o paneles | Capturas o descripción, variables, datasource y rango recomendado. |
+| Runbook específico | Pasos de diagnóstico por dominio crítico. |
+| Matriz de escalamiento | Responsable técnico, producto, plataforma y canal. |
+| Evidencia de validación | Queries probadas, resultados y fecha de validación. |
+| Pendientes aceptados | Brechas conocidas y plan de cierre. |
+| Rollback | Cómo volver a versión anterior del dashboard/query si falla. |
+
+## 28. Cómo mantener viva esta documentación
+
+- Revisar `readme_codex.md` y `traspaso_codex.md` en cada cambio de función, wrapper, dashboard o source.
+- Agregar fecha y responsable en documentos específicos si se crean nuevas guías por producto.
+- No aceptar nuevos paneles sin plantilla de interpretación y acción soporte.
+- Mantener sincronizados inventario, dashboard y scripts de validación.
+- Convertir brechas repetidas en tareas de backlog técnico.
+- Revisar trimestralmente si las reglas siguen representando la operación real.

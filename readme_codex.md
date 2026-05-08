@@ -419,3 +419,101 @@ Para replicar el modelo en otro producto se debe cambiar, como mínimo:
 | No hay CI/CD ni runbook de despliegue automatizado | Riesgo de despliegue manual inconsistente. | Crear pipeline o checklist formal. |
 | Permisos/RBAC no documentados | Soporte puede no poder consultar o desplegar funciones. | Documentar roles mínimos por workspace y Grafana. |
 
+
+## 17. Resumen ejecutivo de madurez del repositorio
+
+Esta sección resume, para líderes técnicos y soporte, qué partes del modelo están mejor preparadas para reutilización y qué partes requieren cierre antes de un traspaso productivo completo.
+
+| Área | Madurez observada | Evidencia en repositorio | Riesgo operativo | Acción recomendada |
+|---|---|---|---|---|
+| Organización por capas | Alta para ADA/NOTPII/SIROSAG | Existen `sources`, `helpers`, `domains` y `grafana_wrappers`. | Bajo/medio: el patrón existe, pero debe respetarse en nuevas extensiones. | Usar el patrón como referencia base para otros productos. |
+| Dashboard Grafana | Media | Existe `Plataforma_Monitoreo_AMG.json` con variables y paneles. | Medio: el JSON conserva consultas legacy extensas. | Migrar variables a wrappers livianos de forma controlada. |
+| Funciones ADA | Media/alta | Hay dominios, helpers, validaciones legacy y wrappers. | Medio: revisar contrato `status`/`color` antes de despliegue. | Alinear salida de domains y wrappers antes de operación formal. |
+| ADA AMG | Baja/media | Existen funciones y wrappers, pero el validador reporta inconsistencias. | Alto si se usa sin normalizar. | Normalizar carpeta, extensión `.kql` y reglas del validador. |
+| NOTPII | Media | Existen domains, helpers y wrappers. | Medio: confirmar semántica de `Alertar` y salida global. | Documentar reglas por job/ambiente y validar con datos reales. |
+| SIROSAG | Media | Existe domain resumen y helpers de evaluación. | Medio: JSON tiene variables SIROSAG legacy más granulares que el wrapper refactor. | Confirmar si el modelo refactor reemplaza o complementa las variables legacy. |
+| Validación estática | Media | Existen scripts de auditoría. | Alto actualmente porque el validador falla. | Corregir brechas o actualizar el validador al alcance real. |
+| Despliegue | Baja | No se identificó CI/CD ni runbook automatizado. | Alto: riesgo de diferencias entre repo y LAW/Grafana. | Crear procedimiento de despliegue y rollback. |
+
+## 18. Contratos operativos recomendados
+
+Para que soporte pueda operar el modelo sin ambigüedad, cada componente debería tener un contrato mínimo documentado. Algunos contratos se observan parcialmente en el repositorio, pero conviene formalizarlos.
+
+### 18.1 Contrato de una función `source`
+
+| Campo | Descripción | Estado en repo |
+|---|---|---|
+| Nombre | `fn_src_mlp_ws_<workspace>` o agregador `fn_src_mlp_*_all`. | Observado. |
+| Entradas | `sourceType`/`tableName`, `startTime`, `endTime`; algunos agregadores solo tiempo. | Observado con variaciones. |
+| Salida | Columnas originales o proyección común. | Observado, pero no documentado por función en todos los casos. |
+| Responsabilidad | Acceso a datos y filtro temporal; sin reglas de negocio. | Observado como intención arquitectónica. |
+| Riesgo | Cambiar workspace o tabla impacta todos los consumidores. | Debe manejarse con análisis de dependencias. |
+
+### 18.2 Contrato de una función `domain`
+
+| Campo | Descripción | Recomendación |
+|---|---|---|
+| Entradas | `startTime:datetime`, `endTime:datetime`. | Mantener estándar para facilitar wrappers. |
+| Salida mínima | `status` con `OK/ALERT` o `color` con código hexadecimal. | Normalizar: idealmente devolver ambos cuando sea posible. |
+| Regla | Explicar condiciones exactas que generan alerta. | Documentar en el archivo o en catálogo de dominios. |
+| Dependencias | Helpers y sources llamados. | Mantener mapa actualizado con scripts. |
+| Acción soporte | Qué revisar cuando el dominio alerta. | Debe existir en el runbook del producto. |
+
+### 18.3 Contrato de un wrapper Grafana
+
+| Campo | Descripción | Recomendación |
+|---|---|---|
+| Entrada temporal | `bin($__timeFrom, 1m)`, `bin($__timeTo, 1m)`. | Mantener salvo necesidad justificada. |
+| Llamada | Una sola función principal. | Permite trazabilidad y auditoría. |
+| Proyección | `project color`, `project status` o tabla de detalle. | Debe coincidir con el panel que lo consume. |
+| Uso visual | Variable, chip, tabla o detalle. | Documentar en inventario de paneles. |
+
+## 19. Trazabilidad mínima para soporte
+
+Cuando soporte reporte una alerta o un error de monitoreo, debería poder completar esta cadena:
+
+```mermaid
+flowchart LR
+    P[Panel o variable] --> W[Wrapper var_mlp_*]
+    W --> D[Domain fn_prd_mlp_*_dom_*]
+    D --> H[Helper, si aplica]
+    H --> S[Source fn_src_mlp_*]
+    S --> T[Workspace y tabla]
+    T --> R[Responsable técnico o producto]
+```
+
+| Elemento | Dato que soporte debe registrar | Ejemplo de formato |
+|---|---|---|
+| Panel/variable | Nombre visible o variable Grafana. | `var_mlp_ada_dispatch` |
+| Wrapper | Ruta del archivo wrapper. | `grafana_wrappers/prd/mlp/ada/var_mlp_ada_dispatch.kql` |
+| Domain | Función de estado. | `fn_prd_mlp_ada_dom_dispatch_status` |
+| Helper | Regla específica. | `fn_prd_mlp_ada_lag_helpers` |
+| Source | Función de acceso. | `fn_src_mlp_ws_ada` |
+| Fuente | Workspace/tabla. | `mlp-prd-law-ada / ContainerAppSystemLogs_CL` |
+| Evidencia | Ventana y resultado. | `2026-05-08 10:00-10:30 UTC, status=ALERT` |
+
+## 20. Guía de validación documental antes de entregar a soporte
+
+Antes de hacer un traspaso formal, se recomienda validar la documentación con esta lista:
+
+| Validación | Criterio de aceptación | Estado actual |
+|---|---|---|
+| Inventario de productos | ADA, ADA AMG, NOTPII y SIROSAG aparecen descritos. | Cubierto en este documento. |
+| Inventario de fuentes | Cada source relevante tiene workspace lógico y tabla. | Cubierto a nivel general; falta contrato por función individual. |
+| Inventario de paneles | Dashboard, variables y paneles principales identificados. | Cubierto; falta descripción funcional dentro del JSON/Grafana. |
+| Runbook | Existe guía operativa diaria. | Cubierto en `traspaso_codex.md`. |
+| Escalamiento | Existe matriz de responsabilidades sugerida. | Cubierto en `traspaso_codex.md`; falta matriz oficial de la organización. |
+| Validación técnica | Scripts de auditoría ejecutados y resultados documentados. | Cubierto; hay falla pendiente en validador KQL. |
+| Despliegue | Existe paso a paso de despliegue y rollback. | Parcial; falta procedimiento oficial y automatización. |
+
+## 21. Recomendaciones de mejora priorizadas
+
+| Prioridad | Mejora | Beneficio esperado |
+|---|---|---|
+| P0 | Corregir o ajustar `validate_kql_references.py` según el alcance real del paquete. | Permite una señal confiable de calidad antes de entregar cambios. |
+| P0 | Normalizar contratos de salida `status`/`color` entre domains y wrappers. | Evita fallas de panel por columnas inexistentes. |
+| P1 | Formalizar despliegue de funciones LAW y dashboard Grafana. | Reduce diferencias entre repositorio y ambiente real. |
+| P1 | Migrar el JSON a wrappers livianos cuando la paridad esté validada. | Reduce costo y duplicación de KQL. |
+| P1 | Definir matriz oficial de severidades y escalamiento. | Mejora tiempos de respuesta y claridad operativa. |
+| P2 | Agregar documentación por dominio con ejemplos de queries de diagnóstico. | Facilita capacitación y soporte N2. |
+| P2 | Incorporar validación Markdown o revisión documental en CI. | Mantiene vivos los documentos de traspaso. |
