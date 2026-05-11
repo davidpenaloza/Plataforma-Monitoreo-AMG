@@ -1,5 +1,10 @@
 # Plataforma Monitoreo AMG — documentación técnica del repositorio
 
+
+## Documentación oficial del modelo de monitoreo
+
+La documentación técnica y operativa oficial del nuevo modelo de monitoreo se encuentra en [docs/modelo-monitoreo/README.md](docs/modelo-monitoreo/README.md). El portal de soporte debe enlazar o resumir esa documentación sin duplicarla completa.
+
 ## Resumen ejecutivo
 
 Este documento técnico consolida el entendimiento del repositorio **Plataforma Monitoreo AMG** para que soporte, analistas y líderes técnicos puedan mantener y reutilizar el modelo de monitoreo. El repositorio contiene un dashboard Grafana exportado, funciones KQL para Azure Log Analytics, wrappers para variables Grafana, queries de Power Automate, scripts de auditoría y documentación de refactorización.
