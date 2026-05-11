@@ -42,6 +42,7 @@ let fn_prd_mlp_ada_lag_thresholds = () {
     "planes_acc_mensuales_EXTRACCION_MINA", 2100, "Planes acumulados mensuales",
     "planes_acc_mensuales_PLANTA_CONCENTRADORA_CU_FINO_PRODUCIDO", 2100, "Planes acumulados mensuales",
     "planes_acc_mensuales_PLANTA_CONCENTRADORA_MO_FINO_PRODUCIDO", 2100, "Planes acumulados mensuales",
-    "planes_acc_mensuales_PLANTA_CONCENTRADORA_RECUPERACION_CU", 2100, "Planes acumulados mensuales"
+    "planes_acc_mensuales_PLANTA_CONCENTRADORA_RECUPERACION_CU", 2100, "Planes acumulados mensuales",
+    "optimizador_mezcla", 1440, "Optimizador de mezcla"
   ]
 };
