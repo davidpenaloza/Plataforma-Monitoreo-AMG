@@ -6,7 +6,7 @@ let fn_prd_mlp_ada_dom_blockgrade_status = (startTime:datetime, endTime:datetime
     | where OperationName in ("PL_FULL - Succeeded", "PL_BLOCKGRADE - Succeeded")
     | count
   ) > 0;
-  let lag = fn_prd_mlp_ada_lag_helpers(dynamic(["blockgrade_bybucket"]), startTime, endTime);
+  let lag = toscalar(fn_prd_mlp_ada_lag_helpers(dynamic(["blockgrade_bybucket"]), startTime, endTime));
   let en_mantencion = toscalar(fn_prd_mlp_ada_en_mantencion(startTime, endTime) | project en_mantencion);
   let status = iff(en_mantencion, "OK", iff(not(ing_ok) or lag == "ALERT", "ALERT", "OK"));
   print status = status
