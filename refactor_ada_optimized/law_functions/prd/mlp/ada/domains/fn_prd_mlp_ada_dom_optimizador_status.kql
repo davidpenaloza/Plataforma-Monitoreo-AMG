@@ -16,7 +16,7 @@ let fn_prd_mlp_ada_dom_optimizador_status = (startTime:datetime, endTime:datetim
     | where Log_s contains "has successfully completed"
     | count
   ) > 0;
-  let lag_optimizador = fn_prd_mlp_ada_lag_helpers(dynamic(["optimizador_mezcla"]), startTime, endTime);
+  let lag_optimizador = toscalar(fn_prd_mlp_ada_lag_helpers(dynamic(["optimizador_mezcla"]), startTime, endTime));
 //  let status = iff(optimizador_run_failed or not(optimizador_job01_ok) or lag_optimizador == "ALERT", "ALERT", "OK");
   let status = iff(not(optimizador_job01_ok) or lag_optimizador == "ALERT", "ALERT", "OK");
 
