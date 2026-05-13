@@ -4,8 +4,10 @@ let fn_prd_mlp_ada_amg_dom_dispatch_status = (startTime:datetime, endTime:dateti
     "StdShiftState","ShiftInfo","SHIFTShiftLoad","StdGrade",
     "dispatch_shiftdumps","dispatch_shiftloads","dispatch_shiftloads2","dispatch_shiftstate","dispatch_tiempos"
   ]);
-  let lag_classic = fn_prd_mlp_ada_lag_helpers(dispatch_tables, startTime, endTime);
-  let lag_nrt = fn_prd_mlp_ada_alert_from_dispatch_nrt_logs(dispatch_tables, startTime, endTime);
+  let lag_classic = toscalar(
+fn_prd_mlp_ada_lag_helpers(dispatch_tables, startTime, endTime));
+  let lag_nrt = toscalar(
+fn_prd_mlp_ada_alert_from_dispatch_nrt_logs(dispatch_tables, startTime, endTime));
   let consec_fail_job17 = toscalar(
     range TimeGeneratedBin_Chile from bin(endTime - 40m, 10m) to bin(endTime - 10m, 10m) step 10m
     | join kind=leftouter (
