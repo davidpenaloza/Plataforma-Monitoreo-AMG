@@ -1,6 +1,6 @@
 let fn_prd_mlp_ada_amg_dom_kpi_status = (startTime:datetime, endTime:datetime) {
   let adaJobsKpiAlert = toscalar(
-    fn_prd_mlp_ada_amg_jobs_status_detail(startTime, endTime)
+    fn_prd_mlp_ada_jobs_status_detail(startTime, endTime)
     | where domain == "KPIs"
     | summarize alertCount = countif(isAlert == true)
     | project alertCount > 0
