@@ -4,6 +4,6 @@ let fn_prd_mlp_ada_en_mantencion = (startTime:datetime, endTime:datetime) {
   | where product_origin == "DISPATCH_CONDICION_OPERACIONAL"
   | top 1 by TimeGenerated desc
   | extend CH1 = tostring(detail["CH-1"]), CH2 = tostring(detail["CH-02"])
-  | extend en_mantencion = iff(trim(" ", tolower(CH1)) != "efectivo" or trim(" ", tolower(CH2)) != "efectivo", true, false)
+  | extend en_mantencion = iff(trim(" ", tolower(CH1)) != "efectivo" and trim(" ", tolower(CH2)) != "efectivo", true, false)
   | project en_mantencion
 };
