@@ -5,11 +5,6 @@ let fn_prd_mlp_ada_amg_dom_kpi_status = (startTime:datetime, endTime:datetime) {
     | summarize alertCount = countif(isAlert == true)
     | project alertCount > 0
   );
-  let count_no_esperados = toscalar(
-    fn_prd_mlp_ada_amg_kpi_alert_rows(endTime - 180m, endTime)
-    | summarize c = dcount(KPINoEsperado)
-    | project c
-  );
-  let status = iff(adaJobsKpiAlert or count_no_esperados > 0, "ALERT", "OK");
+  let status = iff(adaJobsKpiAlert, "ALERT", "OK");
   print status
 };

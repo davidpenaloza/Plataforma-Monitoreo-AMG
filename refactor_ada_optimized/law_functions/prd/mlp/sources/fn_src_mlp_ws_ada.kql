@@ -30,5 +30,11 @@ let fn_src_mlp_ws_ada = (sourceType:string, startTime:datetime, endTime:datetime
       | where TimeGenerated between (startTime .. endTime)
       | where sourceType == "AppServiceConsoleLogs"
       | extend source_table = "AppServiceConsoleLogs"
+    ),
+    (
+      workspace("/subscriptions/c68213bf-7453-4ba4-9aaa-56b822af4c20/resourceGroups/MLP-PRD-RG-ADA/providers/Microsoft.OperationalInsights/workspaces/mlp-prd-law-ada").table("AppServiceHTTPLogs")
+      | where TimeGenerated between (startTime .. endTime)
+      | where sourceType == "AppServiceHTTPLogs"
+      | extend source_table = "AppServiceHTTPLogs"
     )
 };
