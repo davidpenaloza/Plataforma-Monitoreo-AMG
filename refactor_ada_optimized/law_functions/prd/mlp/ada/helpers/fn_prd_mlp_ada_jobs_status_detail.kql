@@ -6,7 +6,7 @@ let jobsConfig = datatable(jobName:string, jobAlias:string, domain:string, thres
     "mlp-prd-caj-ada-job03", "job03_indicadores_globales",          "KPIs",        10, 1,
     "mlp-prd-caj-ada-job04", "job04_stock_chacay",                  "KPIs",        10, 1,
     "mlp-prd-caj-ada-job05", "job05_servicios_mina",                "KPIs",        10, 1,
-    "mlp-prd-caj-ada-job06", "job06_alarms-operational-parameters", "Alarmas",     35, 10,
+    "mlp-prd-caj-ada-job06", "job06_alarms-operational-parameters", "Alarmas",     60, 10,
     "mlp-prd-caj-ada-job07", "job07_alarms-service",                "Alarmas",     10, 1,
     "mlp-prd-caj-ada-job08", "job08_chancado",                      "KPIs",        10, 1,
     "mlp-prd-caj-ada-job09", "job09_carguio",                       "KPIs",        10, 1,
