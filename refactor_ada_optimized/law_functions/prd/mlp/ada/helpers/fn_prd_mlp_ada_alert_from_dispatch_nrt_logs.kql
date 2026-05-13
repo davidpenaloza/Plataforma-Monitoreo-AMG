@@ -10,5 +10,5 @@ let fn_prd_mlp_ada_alert_from_dispatch_nrt_logs = (tables:dynamic, startTime:dat
       | extend diff_minutos = segundos / 60.0
       | extend alert = iff(diff_minutos > 6, 1, 0)
       | summarize has_alert = max(alert);
-  iff(toscalar(t) == 1, "ALERT", "OK")
+print estado = iff(coalesce(toscalar(t), 1) == 1, "ALERT", "OK")
 };
