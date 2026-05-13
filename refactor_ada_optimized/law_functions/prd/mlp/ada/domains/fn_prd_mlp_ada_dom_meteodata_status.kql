@@ -23,7 +23,7 @@ let fn_prd_mlp_ada_dom_meteodata_status = (startTime:datetime, endTime:datetime)
   );
   let job01_alert = iff(expected_job01 == 0, false, real_job01 < ceiling(0.85 * expected_job01));
   let job02_alert = iff(expected_job02 == 0, false, real_job02 < ceiling(0.85 * expected_job02));
-  let lag = fn_prd_mlp_ada_lag_helpers(dynamic(["meteodata"]), startTime, endTime);
+  let lag = toscalar(fn_prd_mlp_ada_lag_helpers(dynamic(["meteodata"]), startTime, endTime));
   let status = iff(job01_alert or job02_alert or lag == "ALERT", "ALERT", "OK");
   print status = status
 };
