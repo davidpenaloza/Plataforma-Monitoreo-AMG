@@ -11,6 +11,8 @@ let fn_prd_mlp_ada_lag_helpers = (tables:dynamic, startTime:datetime, endTime:da
       | where mensaje startswith "timestamp_"
       | extend tabla = replace_string(replace_string(substring(mensaje, 10, indexof(mensaje, ": ") - 10), "last_record_", ""), "last_reg_", "")
       | where tabla in (tables)
+      | order by fecha_log_UTC desc
+      | take 1
       | extend ultimo_timestamp = todatetime(substring(mensaje, indexof(mensaje, ": ") + 2, 19))
       | extend ultimo_timestamp = datetime_local_to_utc(ultimo_timestamp, "America/Santiago")
       | extend diff_minutos = round(datetime_diff("second", fecha_log_UTC, ultimo_timestamp) / 60.0, 1)
