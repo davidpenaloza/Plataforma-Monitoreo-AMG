@@ -91,24 +91,3 @@ let cfg_dominios = datatable(
     "Alarmas", "Fallas_job_13", "mlp-prd-caj-ssag-job13", "ejecucion", 60, "lte", 5, 0, 0,
     "Alarmas", "Desfase_Job_13", "mlp-prd-caj-ssag-job13", "desfase", 60, "", 5, 0, 0
 ];
-
-
-
-cfg_dominios_dict() {
-
-    cfg_dominios
-    | summarize Metrics = make_bag(pack(
-            Metric,
-            pack(
-                "JobName", JobName,
-                "Tipo", Tipo,
-                "VentanaMin", VentanaMin,
-                "Param1", Param1,
-                "Param2", Param2,
-                "Param3", Param3,
-                "Param4", Param4
-            )
-        ))
-      by Dominio
-    | summarize Dict = make_bag(pack(Dominio, Metrics))
-}
