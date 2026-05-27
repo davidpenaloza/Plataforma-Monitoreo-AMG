@@ -1,9 +1,29 @@
 let fn_prd_mlp_ada_dom_front_status = (startTime:datetime, endTime:datetime) {
-  let has_alert = toscalar(
+   let has_alert = toscalar(
     fn_src_mlp_ws_ada("AppServiceConsoleLogs", endTime - 10m, endTime)
-    | where TimeGenerated between (endTime - 10m .. endTime)
-    | where (Level == "Error" and ResultDescription contains "/usr/src/app/app/") or ResultDescription contains "Invalid access token"
-    | count
-   ) > 2;
-  print status = iff(has_alert, "ALERT", "OK")
+    | where TimeGenerated between (endTime -10m .. endTime)
+| where (Level == "Error" and ResultDescription contains "/usr/src/app/app/") or ResultDescription contains "Invalid access token"
+| count
+) > 4;
+let http_down = toscalar(
+fn_src_mlp_ws_ada("AppServiceHTTPLogs", startTime, endTime)
+| extend dur = todouble(TimeTaken)
+| summarize
+Requests = count(),
+FailPct  = 100.0 * countif(Result != "Success") / count(),
+P95      = percentile(dur, 95)
+by bin(TimeGenerated, 5m)
+| extend State = case(
+Requests == 0, "DOWN",
+FailPct >= 30 or P95 >= 6000, "DOWN",
+FailPct >= 15 or P95 >= 4500, "DEGRADED",
+"OK"
+)
+| order by TimeGenerated desc
+| take 1
+| project tobool(State == "DOWN")
+);
+//let status = iff(has_alert or http_down, "ALERT", "OK");
+let status = iff(http_down, "ALERT", "OK");
+print status
 };

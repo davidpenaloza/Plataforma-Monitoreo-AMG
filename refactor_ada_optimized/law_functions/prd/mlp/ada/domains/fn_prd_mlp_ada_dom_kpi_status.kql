@@ -11,5 +11,5 @@ let fn_prd_mlp_ada_dom_kpi_status = (startTime:datetime, endTime:datetime) {
     | project c
   );
   let status = iff(adaJobsKpiAlert or count_no_esperados > 0, "ALERT", "OK");
-  print status = status
+  print status
 };
