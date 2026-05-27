@@ -1,7 +1,7 @@
 let fn_prd_mlp_pdm_caex_dom_resumen_status = (startTime:datetime, endTime:datetime) {
-    let fuentes = toscalar(fn_prd_mlp_pdm_caex_dom_fuentes_status(startTime, endTime) | project Estado);
-    let jobs = toscalar(fn_prd_mlp_pdm_caex_dom_jobs_status(startTime, endTime) | project Estado);
-    let emails = toscalar(fn_prd_mlp_pdm_caex_dom_emails_status(startTime, endTime) | project Estado);
+    let fuentes = toscalar(fn_prd_mlp_pdm_caex_dom_fuentes_status(startTime, endTime) | project status);
+    let jobs = toscalar(fn_prd_mlp_pdm_caex_dom_jobs_status(startTime, endTime) | project status);
+    let emails = toscalar(fn_prd_mlp_pdm_caex_dom_emails_status(startTime, endTime) | project status);
     print Fuentes = fuentes, Jobs_Dominio = jobs, Envio_Emails = emails
-    | extend Estado = iff(Fuentes == 'Alertar' or Jobs_Dominio == 'Alertar' or Envio_Emails == 'Alertar', 'Alertar', 'No Alertar');
+    | extend status = iff(Fuentes == 'ALERT' or Jobs_Dominio == 'ALERT' or Envio_Emails == 'ALERT', 'ALERT', 'OK');
 };

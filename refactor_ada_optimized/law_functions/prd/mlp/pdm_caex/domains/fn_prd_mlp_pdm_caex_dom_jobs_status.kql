@@ -17,7 +17,7 @@ let fn_prd_mlp_pdm_caex_dom_jobs_status = (startTime:datetime, endTime:datetime)
     | summarize StatusCount = count() by jobName, ActionName, TimeGeneratedBin = bin(TimeGenerated, 15m)
     | where ActionName == 'runFailed'
     | summarize cant_fallas = sum(StatusCount)
-    | project Estado = iff(cant_fallas >= 3, 'Alertar', 'No Alertar')
-    | union (datatable(Estado:string)['No Alertar'])
+    | project status = iff(cant_fallas >= 3, 'ALERT', 'OK')
+    | union (datatable(status:string)['OK'])
     | take 1
 };

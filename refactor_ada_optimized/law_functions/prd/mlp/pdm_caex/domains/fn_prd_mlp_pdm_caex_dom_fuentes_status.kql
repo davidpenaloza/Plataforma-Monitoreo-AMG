@@ -23,7 +23,7 @@ let fn_prd_mlp_pdm_caex_dom_fuentes_status = (startTime:datetime, endTime:dateti
     | join kind=inner tabla on fuente
     | extend sobre_umbral = Diferencia_Minutos > umbral_min
     | summarize alertar_flag = any(sobre_umbral)
-    | project Estado = iff(alertar_flag, 'Alertar', 'No Alertar')
-    | union (datatable(Estado:string)['No Alertar'])
+    | project status = iff(alertar_flag, 'ALERT', 'OK')
+    | union (datatable(status:string)['OK'])
     | take 1
 };
