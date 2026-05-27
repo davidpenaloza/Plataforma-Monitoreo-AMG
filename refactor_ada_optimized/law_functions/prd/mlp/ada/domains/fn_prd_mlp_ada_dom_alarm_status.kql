@@ -1,20 +1,20 @@
-let fn_prd_mlp_ada_dom_alarm_status = (startTime:datetime, endTime:datetime) {
-  let adaJobsAlarmAlert = toscalar(
+ let adaJobsAlarmAlert = toscalar(
     fn_prd_mlp_ada_jobs_status_detail(startTime, endTime)
     | where domain == "Alarmas"
     | summarize alertCount = countif(isAlert == true)
     | project alertCount > 0
-  );
-  let incidentes_largos_alarmas = toscalar(
+    );
+let incidentes_largos_alarmas = toscalar(
     fn_src_mlp_ws_ada("ContainerAppConsoleLogs_CL", endTime - 3h, endTime)
-    | where TimeGenerated >= ago(3h)
+    | where TimeGenerated >= endTime - 3h and TimeGenerated < endTime
     | where ContainerJobName_s startswith "mlp-prd-caj-ada-job07"
     | where Log_s startswith "{\"fecha_log_UTC\":"
     | extend ParsedJson = parse_json(Log_s)
-    | extend log_nivel = tostring(ParsedJson.log_nivel),
-             log_capa = tostring(ParsedJson.log_capa),
-             nombre_alarma = tostring(ParsedJson.nombr_alarma),
-             fecha_log_UTC = todatetime(ParsedJson.fecha_log_UTC)
+    | extend
+        log_nivel = tostring(ParsedJson.log_nivel),
+        log_capa = tostring(ParsedJson.log_capa),
+        nombre_alarma = tostring(ParsedJson.nombr_alarma),
+        fecha_log_UTC = todatetime(ParsedJson.fecha_log_UTC)
     | where log_nivel == "ERROR" and log_capa == "domain-alarm"
     | project-away ParsedJson
     | sort by nombre_alarma asc, fecha_log_UTC asc
@@ -27,13 +27,12 @@ let fn_prd_mlp_ada_dom_alarm_status = (startTime:datetime, endTime:datetime) {
     | extend duracion_minutos = datetime_diff("minute", fin_incidente, inicio_incidente)
     | where duracion_minutos >= 60
     | count
-  );
-  let error_conexion_storage = toscalar(
+    );
+let error_conexion_storage = toscalar(
     fn_src_mlp_ws_ada("ContainerAppConsoleLogs_CL", startTime, endTime)
     | where TimeGenerated >= startTime and TimeGenerated < endTime
     | where Log_s contains "[ERROR] Conection error with storage data"
     | count
-  );
-  let status = iff(adaJobsAlarmAlert or incidentes_largos_alarmas > 0 or error_conexion_storage > 0, "ALERT", "OK");
-  print status = status
-};
+    );
+let status = iff(adaJobsAlarmAlert or incidentes_largos_alarmas > 0 or error_conexion_storage > 0, "ALERT", "OK");
+print status

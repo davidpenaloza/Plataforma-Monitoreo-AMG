@@ -1,47 +1,47 @@
 let fn_prd_mlp_ada_dom_global_status = (startTime:datetime, endTime:datetime) {
-  let metric_status = union
-      (fn_prd_mlp_ada_dom_dispatch_status(startTime,endTime)
-      | project Metric='Dispatch', Status=status),
-      (fn_prd_mlp_ada_dom_drillit_status(startTime,endTime)
-      | project Metric='Drillit', Status=status),
-      (fn_prd_mlp_ada_dom_blockgrade_status(startTime,endTime)
-      | project Metric='Blockgrade', Status=status),
-      (fn_prd_mlp_ada_dom_pi_status(startTime,endTime)
-      | project Metric='PI', Status=status),
-      (fn_prd_mlp_ada_dom_plans_status(startTime,endTime)
-      | project Metric='Plans', Status=status),
-      (fn_prd_mlp_ada_dom_meteodata_status(startTime,endTime)
-      | project Metric='Meteodata', Status=status),
-      (fn_prd_mlp_ada_dom_kpi_status(startTime,endTime)
-      | project Metric='KPI', Status=status),
-      (fn_prd_mlp_ada_dom_alarm_status(startTime,endTime)
-      | project Metric='Alarmas', Status=status),
-      (fn_prd_mlp_ada_dom_front_status(startTime,endTime)
-      | project Metric='Front', Status=status),
-      (fn_prd_mlp_ada_dom_optimizador_status(startTime,endTime)
-      | project Metric='OptimizadorMezcla', Status=status),
-      (fn_prd_mlp_ada_dom_settings_status(startTime,endTime)
-      | project Metric='Settings', Status=status)
+    let metric_status = union
+        (fn_prd_mlp_ada_dom_dispatch_status(startTime, endTime)
+        | project Metric='Dispatch', Status=print_0),
+        (fn_prd_mlp_ada_dom_drillit_status(startTime, endTime)
+        | project Metric='Drillit', Status=print_0),
+        (fn_prd_mlp_ada_dom_blockgrade_status(startTime, endTime)
+        | project Metric='Blockgrade', Status=print_0),
+        (fn_prd_mlp_ada_dom_pi_status(startTime, endTime)
+        | project Metric='PI', Status=print_0),
+        (fn_prd_mlp_ada_dom_plans_status(startTime, endTime)
+        | project Metric='Plans', Status=print_0),
+        (fn_prd_mlp_ada_dom_meteodata_status(startTime, endTime)
+        | project Metric='Meteodata', Status=print_0),
+        (fn_prd_mlp_ada_dom_kpi_status(startTime, endTime)
+        | project Metric='KPI', Status=print_0),
+        (fn_prd_mlp_ada_dom_alarm_status(startTime, endTime)
+        | project Metric='Alarmas', Status=print_0),
+        (fn_prd_mlp_ada_dom_front_status(startTime, endTime)
+        | project Metric='Front', Status=print_0),
+        (fn_prd_mlp_ada_dom_optimizador_status(startTime, endTime)
+        | project Metric='OptimizadorMezcla', Status=print_0),
+        (fn_prd_mlp_ada_dom_settings_status(startTime, endTime)
+        | project Metric='Settings', Status=print_0)
     | summarize Status = take_any(Status) by Metric
     | evaluate pivot(Metric, take_any(Status));
-  metric_status
-  | project
-      Dispatch = iff(column_ifexists('Dispatch', 'OK') == 'ALERT', 'ALERT', 'OK'),
-      Drillit = iff(column_ifexists('Drillit', 'OK') == 'ALERT', 'ALERT', 'OK'),
-      Blockgrade = iff(column_ifexists('Blockgrade', 'OK') == 'ALERT', 'ALERT', 'OK'),
-      PI = iff(column_ifexists('PI', 'OK') == 'ALERT', 'ALERT', 'OK'),
-      Plans = iff(column_ifexists('Plans', 'OK') == 'ALERT', 'ALERT', 'OK'),
-      Meteodata = iff(column_ifexists('Meteodata', 'OK') == 'ALERT', 'ALERT', 'OK'),
-      KPI = iff(column_ifexists('KPI', 'OK') == 'ALERT', 'ALERT', 'OK'),
-      Alarmas = iff(column_ifexists('Alarmas', 'OK') == 'ALERT', 'ALERT', 'OK'),
-      Front = iff(column_ifexists('Front', 'OK') == 'ALERT', 'ALERT', 'OK'),
-      OptimizadorMezcla = iff(column_ifexists('OptimizadorMezcla', 'OK') == 'ALERT', 'ALERT', 'OK'),
-      Settings = iff(column_ifexists('Settings', 'OK') == 'ALERT', 'ALERT', 'OK')
-  | extend status = iff(
-      Dispatch == 'ALERT' or Drillit == 'ALERT' or Blockgrade == 'ALERT' or PI == 'ALERT' or
-      Plans == 'ALERT' or Meteodata == 'ALERT' or KPI == 'ALERT' or Alarmas == 'ALERT' or Front == 'ALERT' or
-      OptimizadorMezcla == 'ALERT' or Settings == 'ALERT',
-      'ALERT',
-      'OK'
-    )
+metric_status
+| project
+    Dispatch = iff(column_ifexists('Dispatch', 'OK') == 'ALERT', 'ALERT', 'OK'),
+    Drillit = iff(column_ifexists('Drillit', 'OK') == 'ALERT', 'ALERT', 'OK'),
+    Blockgrade = iff(column_ifexists('Blockgrade', 'OK') == 'ALERT', 'ALERT', 'OK'),
+    PI = iff(column_ifexists('PI', 'OK') == 'ALERT', 'ALERT', 'OK'),
+    Plans = iff(column_ifexists('Plans', 'OK') == 'ALERT', 'ALERT', 'OK'),
+    Meteodata = iff(column_ifexists('Meteodata', 'OK') == 'ALERT', 'ALERT', 'OK'),
+    KPI = iff(column_ifexists('KPI', 'OK') == 'ALERT', 'ALERT', 'OK'),
+    Alarmas = iff(column_ifexists('Alarmas', 'OK') == 'ALERT', 'ALERT', 'OK'),
+    Front = iff(column_ifexists('Front', 'OK') == 'ALERT', 'ALERT', 'OK'),
+    OptimizadorMezcla = iff(column_ifexists('OptimizadorMezcla', 'OK') == 'ALERT', 'ALERT', 'OK'),
+    Settings = iff(column_ifexists('Settings', 'OK') == 'ALERT', 'ALERT', 'OK')
+| extend status = iff(
+                      Dispatch == 'ALERT' or Drillit == 'ALERT' or Blockgrade == 'ALERT' or PI == 'ALERT' or
+    Plans == 'ALERT' or Meteodata == 'ALERT' or KPI == 'ALERT' or Alarmas == 'ALERT' or Front == 'ALERT' or
+    OptimizadorMezcla == 'ALERT' or Settings == 'ALERT',
+                      'ALERT',
+                      'OK'
+                  )
 };

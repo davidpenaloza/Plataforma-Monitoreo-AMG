@@ -8,5 +8,5 @@ let fn_prd_mlp_ada_dom_drillit_status = (startTime:datetime, endTime:datetime) {
   ) > 0;
   let lag = toscalar(fn_prd_mlp_ada_lag_helpers(dynamic(["drillit_drillings","drillit_drill_state_history"]), startTime, endTime));
   let status = iff(not(ing_ok) or lag == "ALERT", "ALERT", "OK");
-  print status = status
+  print status 
 };
