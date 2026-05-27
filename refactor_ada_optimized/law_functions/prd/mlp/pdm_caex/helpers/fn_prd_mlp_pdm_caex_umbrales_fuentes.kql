@@ -1,10 +1,8 @@
-let fn_prd_mlp_ada_umbrales_fuentes = (){ 
-datatable(
-    fuente: string,
-    umbral: string
-)
-[
-    "HOROMETROS", "10080",
-    "MINECARE",   "40",
-    "DISPATCH",   "70"
-]};
+let fn_prd_mlp_pdm_caex_umbrales_fuentes = () {
+    datatable(fuente:string, umbral_min:int)
+    [
+        'HOROMETROS', 10080,
+        'MINECARE', 40,
+        'DISPATCH', 70
+    ]
+};
