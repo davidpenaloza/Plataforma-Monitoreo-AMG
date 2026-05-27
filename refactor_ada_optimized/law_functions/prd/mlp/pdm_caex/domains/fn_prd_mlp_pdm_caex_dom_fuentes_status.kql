@@ -1,29 +1,7 @@
 let fn_prd_mlp_pdm_caex_dom_fuentes_status = (startTime:datetime, endTime:datetime) {
-    let tabla = datatable(fuente:string, umbral_min:int)
-    [
-        'HOROMETROS', 10080,
-        'MINECARE', 40,
-        'DISPATCH', 70
-    ];
-
-    SparkLoggingEvent_CL
-    | where TimeGenerated between (startTime .. endTime)
-    | where log_logger_s == 'PDM_CAEX'
-    | where Message has_any ('HOROMETROS', 'MINECARE', 'DISPATCH')
-    | summarize arg_max(TimeGenerated, Message) by source_key = case(
-        Message has 'HOROMETROS', 'HOROMETROS',
-        Message has 'MINECARE', 'MINECARE',
-        Message has 'DISPATCH', 'DISPATCH',
-        'UNKNOWN')
-    | where source_key != 'UNKNOWN'
-    | extend json_msg = parse_json(Message)
-    | extend fuente = tostring(json_msg.fuente)
-    | extend ultimo_timestamp_fuente = datetime_local_to_utc(todatetime(json_msg.ultimo_timestamp), 'America/Santiago')
-    | extend Diferencia_Minutos = datetime_diff('minute', now(), ultimo_timestamp_fuente)
-    | join kind=inner tabla on fuente
-    | extend sobre_umbral = Diferencia_Minutos > umbral_min
-    | summarize alertar_flag = any(sobre_umbral)
-    | project status = iff(alertar_flag, 'ALERT', 'OK')
-    | union (datatable(status:string)['OK'])
-    | take 1
+    union
+        (fn_prd_mlp_pdm_caex_dom_fuente_horometros_status(startTime, endTime) | project fuente, status),
+        (fn_prd_mlp_pdm_caex_dom_fuente_minecare_status(startTime, endTime) | project fuente, status),
+        (fn_prd_mlp_pdm_caex_dom_fuente_dispatch_status(startTime, endTime) | project fuente, status)
+    | summarize status = iff(countif(status == 'ALERT') > 0, 'ALERT', 'OK')
 };
