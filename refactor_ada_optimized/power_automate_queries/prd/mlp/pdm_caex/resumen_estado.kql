@@ -1,0 +1,37 @@
+// Ventana de observación para PDM CAEX acorde a sus tolerancias operativas.
+let lookback = 3h;
+let fuentes_global = toscalar(fn_prd_mlp_pdm_caex_dom_fuentes_status(ago(lookback), now()) | project status);
+let jobs = toscalar(fn_prd_mlp_pdm_caex_dom_jobs_status(ago(lookback), now()) | project status);
+let emails = toscalar(fn_prd_mlp_pdm_caex_dom_emails_status(ago(lookback), now()) | project status);
+let horometros = toscalar(fn_prd_mlp_pdm_caex_dom_fuente_horometros_status(ago(lookback), now()) | project status);
+let minecare = toscalar(fn_prd_mlp_pdm_caex_dom_fuente_minecare_status(ago(lookback), now()) | project status);
+let dispatch = toscalar(fn_prd_mlp_pdm_caex_dom_fuente_dispatch_status(ago(lookback), now()) | project status);
+let resumen = toscalar(fn_prd_mlp_pdm_caex_dom_resumen_status(ago(lookback), now()) | project status);
+
+print rows = pack_array(
+    pack("orden", 1, "producto", "Fuentes (Global)", "estado", fuentes_global),
+    pack("orden", 2, "producto", "Fuente HOROMETROS", "estado", horometros),
+    pack("orden", 3, "producto", "Fuente MINECARE", "estado", minecare),
+    pack("orden", 4, "producto", "Fuente DISPATCH", "estado", dispatch),
+    pack("orden", 5, "producto", "Jobs Dominio", "estado", jobs),
+    pack("orden", 6, "producto", "Envio Emails", "estado", emails),
+    pack("orden", 7, "producto", "Resumen PDM CAEX", "estado", resumen)
+)
+| mv-expand row = rows
+| project
+    orden = toint(row.orden),
+    producto = tostring(row.producto),
+    estado = tostring(row.estado)
+| extend color = case(
+    estado == "ALERT", "#E53935",
+    estado == "WARNING", "#FFF4CC",
+    "#EAF4EA"
+)
+| extend icono = case(
+    estado == "ALERT", "🔴",
+    estado == "WARNING", "🟡",
+    estado == "OK", "🟢",
+    "⚪"
+)
+| project orden, producto, estado, color, icono
+| order by orden asc

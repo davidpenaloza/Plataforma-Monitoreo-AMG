@@ -1,0 +1,2 @@
+fn_prd_mlp_pdm_caex_dom_retraso_logs_avg_1h(ago(24h), now())
+| where Hora between (bin($__timeFrom, 1m) .. bin($__timeTo, 1m))
