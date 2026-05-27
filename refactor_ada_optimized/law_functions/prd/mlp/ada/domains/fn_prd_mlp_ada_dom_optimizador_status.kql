@@ -20,5 +20,5 @@ let fn_prd_mlp_ada_dom_optimizador_status = (startTime:datetime, endTime:datetim
 //  let status = iff(optimizador_run_failed or not(optimizador_job01_ok) or lag_optimizador == "ALERT", "ALERT", "OK");
   let status = iff(not(optimizador_job01_ok) or lag_optimizador == "ALERT", "ALERT", "OK");
 
-  print status = status
+  print status 
 };
