@@ -102,6 +102,49 @@ Para cada dominio registrar:
 - Confirmar visualización y colores.
 - Actualizar catálogo y documentación.
 
+## Paso 8: empaquetar traspaso a soporte (obligatorio)
+
+Antes de dar por terminado un producto nuevo, dejar un paquete mínimo para soporte:
+
+1. **Mapa de trazabilidad** (panel -> wrapper -> función dominio -> helper/source).
+2. **Lista de funciones a desplegar en orden** (helpers antes que dominios).
+3. **Query Power Automate** `resumen_estado.kql` con formato estándar:
+   `orden, producto, estado, color, icono`.
+4. **Ejemplos de ejecución en LAW** (copiar/pegar):
+   - estado global
+   - estado por dominio
+   - estado por componente crítico
+5. **Errores frecuentes y resolución rápida** (función no encontrada, permisos, sin datos).
+
+### Plantilla breve de traspaso (copiar y completar)
+
+```md
+# Traspaso <producto> - <ambiente>
+
+## 1) Qué monitorea
+- Dominio 1: ...
+- Dominio 2: ...
+
+## 2) Mapa técnico
+- Panel: ...
+- Wrapper: ...
+- Dominio: ...
+- Helpers/Sources: ...
+
+## 3) Orden de despliegue LAW
+1. helpers: ...
+2. domains: ...
+3. wrappers/power automate: ...
+
+## 4) Queries operativas para soporte
+- Global: `fn_prd_mlp_<producto>_dom_resumen_status(ago(3h), now())`
+- Componente crítico: `...`
+
+## 5) Criterio de escalamiento
+- Escalar cuando ...
+- Evidencia mínima: ...
+```
+
 ## Checklist de incorporación
 
 - [ ] Producto y ambiente definidos.
