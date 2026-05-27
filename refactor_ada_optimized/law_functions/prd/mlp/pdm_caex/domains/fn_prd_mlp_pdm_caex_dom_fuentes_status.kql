@@ -1,0 +1,7 @@
+let fn_prd_mlp_pdm_caex_dom_fuentes_status = (startTime:datetime, endTime:datetime) {
+    union
+        (fn_prd_mlp_pdm_caex_dom_fuente_horometros_status(startTime, endTime) | project fuente, status),
+        (fn_prd_mlp_pdm_caex_dom_fuente_minecare_status(startTime, endTime) | project fuente, status),
+        (fn_prd_mlp_pdm_caex_dom_fuente_dispatch_status(startTime, endTime) | project fuente, status)
+    | summarize status = iff(countif(status == 'ALERT') > 0, 'ALERT', 'OK')
+};

@@ -1,0 +1,8 @@
+let fn_prd_mlp_pdm_caex_dom_retraso_logs_avg_1h = (startTime:datetime, endTime:datetime) {
+    DatabricksJobs
+    | where TimeGenerated between (startTime .. endTime)
+    | extend IngestionDelayHour = datetime_diff('hour', ingestion_time(), TimeGenerated)
+    | summarize AvgDelay = avg(IngestionDelayHour) by Hora = bin(TimeGenerated, 1h)
+    | extend DelayPromedio_h = strcat(round(AvgDelay, 1), ' h')
+    | project Hora, DelayPromedio_h
+};

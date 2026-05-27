@@ -1,0 +1,23 @@
+let fn_prd_mlp_pdm_caex_dom_jobs_status = (startTime:datetime, endTime:datetime) {
+    let ADBJobs_map = datatable(jobName:string, jobId:string)
+    [
+        '[MLP]_[PdM_CAEX]_Ingesta_Estados_Caex_Dispatch', '909168767327971',
+        '[MLP]_[PdM_CAEX]_Ingesta_datos_minecare_para_dash_caex', '832666238214693',
+        '[MLP]_[PDM_CAEX]_Generacion_Estados_Alarmas', '751304498227116',
+        '[MLP]_[PDM_CAEX]_Ingesta_Estados_Criterio_Tendencia', '346139230795529'
+    ];
+
+    DatabricksJobs
+    | where TimeGenerated between (startTime .. endTime)
+    | extend json_RequestParams = parse_json(RequestParams)
+    | mv-expand json_RequestParams
+    | extend jobId = tostring(json_RequestParams.jobId)
+    | join kind=inner ADBJobs_map on jobId
+    | summarize arg_max(TimeGenerated, *) by RequestId
+    | summarize StatusCount = count() by jobName, ActionName, TimeGeneratedBin = bin(TimeGenerated, 15m)
+    | where ActionName == 'runFailed'
+    | summarize cant_fallas = sum(StatusCount)
+    | project status = iff(cant_fallas >= 3, 'ALERT', 'OK')
+    | union (datatable(status:string)['OK'])
+    | take 1
+};

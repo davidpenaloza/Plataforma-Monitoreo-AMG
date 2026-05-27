@@ -1,0 +1,11 @@
+let fn_prd_mlp_pdm_caex_dom_emails_status = (startTime:datetime, endTime:datetime) {
+    AzureMetrics
+    | where TimeGenerated between (startTime .. endTime)
+    | where ResourceProvider == 'MICROSOFT.LOGIC'
+    | where Resource == 'ams-uat-dataplatform-logapp-pel-pdm-caex-sendmail'
+    | where MetricName == 'RunsFailed'
+    | summarize runs_failed = sum(Total)
+    | project status = iff(runs_failed > 0, 'ALERT', 'OK')
+    | union (datatable(status:string)['OK'])
+    | take 1
+};

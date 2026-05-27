@@ -73,3 +73,32 @@ Si un runbook del portal contradice esta documentación, se debe levantar correc
 - Matriz de escalamiento: **Por definir**.
 - Calendario de mantenimientos: **Por definir**.
 - Ubicación definitiva de runbooks en portal de soporte: **Por definir**.
+
+## Caso aplicado: PDM CAEX (UAT)
+
+Este producto se incorporó al modelo con patrón completo (helpers + domains + wrappers + Power Automate).
+
+### Qué debe usar soporte en PDM CAEX
+
+- **Estado global**: `fn_prd_mlp_pdm_caex_dom_resumen_status`.
+- **Estado fuentes global**: `fn_prd_mlp_pdm_caex_dom_fuentes_status`.
+- **Estado por fuente**:
+  - `fn_prd_mlp_pdm_caex_dom_fuente_horometros_status`
+  - `fn_prd_mlp_pdm_caex_dom_fuente_minecare_status`
+  - `fn_prd_mlp_pdm_caex_dom_fuente_dispatch_status`
+- **Jobs dominio**: `fn_prd_mlp_pdm_caex_dom_jobs_status`.
+- **Envío emails**: `fn_prd_mlp_pdm_caex_dom_emails_status`.
+
+### Lección operativa clave
+
+Si aparece error de función no encontrada (ejemplo: helper de umbrales), validar orden de despliegue:
+
+1. Helpers de umbral.
+2. Funciones dominio que consumen helpers.
+3. Wrappers Grafana y query de Power Automate.
+
+Para PDM CAEX, dejar disponible la query de automatización en:
+
+- `refactor_ada_optimized/power_automate_queries/prd/mlp/pdm_caex/resumen_estado.kql`
+
+Esto permite a soporte consumir el estado en formato estándar (`orden`, `producto`, `estado`, `color`, `icono`) sin reescribir lógica de negocio.

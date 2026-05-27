@@ -1,0 +1,14 @@
+let fn_prd_mlp_pdm_caex_dom_fuente_dispatch_status = (startTime:datetime, endTime:datetime) {
+    let umbral = toscalar(fn_prd_mlp_pdm_caex_umbrales_fuentes() | where fuente == 'DISPATCH' | project umbral_min);
+    SparkLoggingEvent_CL
+    | where TimeGenerated between (startTime .. endTime)
+    | where log_logger_s == 'PDM_CAEX'
+    | where Message has 'DISPATCH'
+    | summarize arg_max(TimeGenerated, Message)
+    | extend json_msg = parse_json(Message)
+    | extend ultimo_timestamp_fuente = datetime_local_to_utc(todatetime(json_msg.ultimo_timestamp), 'America/Santiago')
+    | extend Diferencia_Minutos = datetime_diff('minute', now(), ultimo_timestamp_fuente)
+    | project fuente = 'DISPATCH', umbral_min = umbral, Diferencia_Minutos, status = iff(Diferencia_Minutos > umbral, 'ALERT', 'OK')
+    | union (datatable(fuente:string, umbral_min:int, Diferencia_Minutos:long, status:string)['DISPATCH', 70, long(0), 'OK'])
+    | take 1
+};

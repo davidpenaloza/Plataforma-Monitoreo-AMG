@@ -1,0 +1,1 @@
+fn_prd_mlp_pdm_caex_dom_resumen_status(bin($__timeFrom, 1m), bin($__timeTo, 1m))
