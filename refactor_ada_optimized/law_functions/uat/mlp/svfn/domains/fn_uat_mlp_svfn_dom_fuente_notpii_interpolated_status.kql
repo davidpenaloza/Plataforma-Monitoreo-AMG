@@ -1,0 +1,23 @@
+let fn_uat_mlp_svfn_dom_fuente_notpii_interpolated_status = (startTime:datetime, endTime:datetime) {
+    let ventana = 30m;
+    let umbral_fallas = 5;
+
+    let logs =
+        fn_src_mlp_uat_ws_notpii_interpolated("ContainerAppSystemLogs_CL", endTime - ventana, endTime)
+        | where JobName_s == "mlp-prd-caj-pisystem-job01"
+        | where Reason_s in ("Completed", "FailedCreate", "DeadlineExceeded", "BackoffLimitExceeded", "KEDAJobMetricInactive")
+        | project TimeGenerated, estado = case(
+            Reason_s == "Completed", "OK",
+            Reason_s in ("FailedCreate", "DeadlineExceeded", "BackoffLimitExceeded", "KEDAJobMetricInactive"), "FAIL",
+            "OTHER"
+        )
+        | order by TimeGenerated desc
+        | take umbral_fallas;
+
+    logs
+    | summarize fallas_consecutivas = countif(estado == "FAIL")
+    | extend dominio = "NotPII_Interpolated"
+    | extend estado = iff(fallas_consecutivas == umbral_fallas, "Alertar", "No alertar")
+    | extend color = iff(estado == "Alertar", "#E53935", "#EAF4EA")
+    | project dominio, estado, color
+};

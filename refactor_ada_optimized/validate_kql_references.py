@@ -39,6 +39,10 @@ REQUIRED_DOMAINS = {
     "fn_prd_mlp_notpii_dom_ingesta_status",
     "fn_prd_mlp_notpii_dom_global_status",
     "fn_prd_mlp_ssag_dom_resumen_status",
+    "fn_uat_mlp_svfn_dom_fuente_notpii_interpolated_status",
+    "fn_uat_mlp_svfn_dom_tags_status",
+    "fn_uat_mlp_svfn_dom_transformacion_status",
+    "fn_uat_mlp_svfn_dom_prediccion_status",
     "fn_uat_mlp_svfn_dom_resumen_status",
 }
 
@@ -60,6 +64,12 @@ REQUIRED_WRAPPERS = {
     "var_mlp_notpii_ingesta.kql",
     "var_mlp_notpii_difusion_global.kql",
     "var_mlp_sirosag_resumen.kql",
+    "var_mlp_svfn_resumen.kql",
+    "var_mlp_svfn_global.kql",
+    "var_mlp_svfn_fuente_notpii_interpolated.kql",
+    "var_mlp_svfn_tags.kql",
+    "var_mlp_svfn_transformacion.kql",
+    "var_mlp_svfn_prediccion.kql",
 }
 
 ALLOWED_NON_DOMAIN_WRAPPERS = {

@@ -21,7 +21,7 @@ El mismo layout aplica para `law_functions_body_only/prd/mlp/`.
 - ADA: `var_mlp_ada_global`, `var_mlp_ada_dispatch`, `var_mlp_ada_drillit`, `var_mlp_ada_pi`, `var_mlp_ada_plans`, `var_mlp_ada_blockgrade`, `var_mlp_ada_meteodata`, `var_mlp_ada_kpi`, `var_mlp_ada_alarm`, `var_mlp_ada_front`, `var_mlp_ada_jobs_detail`, `var_mlp_ada_jobs_detail_legacyfmt`.
 - NOTPII: `var_mlp_notpii_autoloader_dev`, `var_mlp_notpii_autoloader_uat`, `var_mlp_notpii_ingesta`, `var_mlp_notpii_difusion_global`.
 - SIROSAG: `var_mlp_sirosag_resumen`.
-- SVFN UAT: `var_mlp_svfn_resumen`, `var_mlp_svfn_global`, `var_mlp_svfn_tags`, `var_mlp_svfn_transformacion`, `var_mlp_svfn_prediccion`.
+- SVFN UAT: `var_mlp_svfn_resumen`, `var_mlp_svfn_global`, `var_mlp_svfn_fuente_notpii_interpolated`, `var_mlp_svfn_tags`, `var_mlp_svfn_transformacion`, `var_mlp_svfn_prediccion`.
 
 ## 2) Domains activos
 
@@ -48,7 +48,11 @@ El mismo layout aplica para `law_functions_body_only/prd/mlp/`.
 - SIROSAG (1):
   - `fn_prd_mlp_ssag_dom_resumen_status`
 
-- SVFN UAT (1):
+- SVFN UAT (5):
+  - `fn_uat_mlp_svfn_dom_fuente_notpii_interpolated_status`
+  - `fn_uat_mlp_svfn_dom_tags_status`
+  - `fn_uat_mlp_svfn_dom_transformacion_status`
+  - `fn_uat_mlp_svfn_dom_prediccion_status`
   - `fn_uat_mlp_svfn_dom_resumen_status`
 
 ## 3) Helpers activos
@@ -92,6 +96,7 @@ El mismo layout aplica para `law_functions_body_only/prd/mlp/`.
 - `fn_src_mlp_systemlogs_all`
 - `fn_src_mlp_ssag_systemlogs_all`
 - `fn_src_mlp_uat_ws_svfn(sourceType, startTime, endTime)`
+- `fn_src_mlp_uat_ws_notpii_interpolated(sourceType, startTime, endTime)`
 
 ## 5) Regla de limpieza
 

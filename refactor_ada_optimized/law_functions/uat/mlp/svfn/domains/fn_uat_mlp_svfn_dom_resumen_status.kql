@@ -1,65 +1,22 @@
 let fn_uat_mlp_svfn_dom_resumen_status = (startTime:datetime, endTime:datetime) {
-    let ventana_tags = 5m;
-    let ventana_jobs = 1h;
-    let umbral_valor_max = 15000.0;
-    let umbral_fallas_transformacion = 60;
+    let estados = union
+        (fn_uat_mlp_svfn_dom_fuente_notpii_interpolated_status(startTime, endTime)),
+        (fn_uat_mlp_svfn_dom_tags_status(startTime, endTime)),
+        (fn_uat_mlp_svfn_dom_transformacion_status(startTime, endTime)),
+        (fn_uat_mlp_svfn_dom_prediccion_status(startTime, endTime));
 
-    let tags_problema = toscalar(
-        fn_src_mlp_uat_ws_svfn("ContainerAppConsoleLogs_CL", endTime - ventana_tags, endTime)
-        | where ContainerGroupName_s startswith "mlp-uat-caj-svfn-job02"
-        | where Log_s contains "Last values saved in cache"
-        | top 1 by TimeGenerated desc
-        | extend dict_text = extract(@"\{(.+)\}", 1, tostring(Log_s))
-        | extend pairs = split(dict_text, ",")
-        | mv-expand pair = pairs
-        | extend valor = extract(@"':\s*'([^']+)'", 1, tostring(pair))
-        | extend valor_num = todouble(valor)
-        | extend problema = valor == "" or valor == "NaN" or valor == "null" or isnull(valor_num) or valor_num <= 0 or valor_num >= umbral_valor_max
-        | summarize max(iif(problema, 1, 0))
-    );
-
-    let evaluar_fallas_recientes = (jobname:string) {
-        toscalar(
-            fn_src_mlp_uat_ws_svfn("ContainerAppSystemLogs_CL", endTime - ventana_jobs, endTime)
-            | where JobName_s == jobname
-            | where Reason_s in ("Completed", "FailedCreate", "DeadlineExceeded", "BackoffLimitExceeded", "KEDAJobMetricInactive")
-            | project TimeGenerated, estado = case(
-                Reason_s == "Completed", "OK",
-                Reason_s in ("FailedCreate", "DeadlineExceeded", "BackoffLimitExceeded", "KEDAJobMetricInactive"), "FAIL",
-                "OTHER"
-            )
-            | order by TimeGenerated desc
-            | take umbral_fallas_transformacion
-            | summarize total = count(), fallas = countif(estado == "FAIL")
-            | project iif(total >= umbral_fallas_transformacion and fallas == umbral_fallas_transformacion, 1, 0)
-        )
-    };
-
-    let job01_fallas = evaluar_fallas_recientes("mlp-uat-caj-svfn-job01");
-    let job02_fallas = evaluar_fallas_recientes("mlp-uat-caj-svfn-job02");
-
-    let evaluar_prediccion = (patron:string) {
-        toscalar(
-            fn_src_mlp_uat_ws_svfn("ContainerAppConsoleLogs_CL", endTime - ventana_tags, endTime)
-            | where ContainerGroupName_s startswith "mlp-uat-caj-svfn-job02"
-            | where Log_s contains patron
-            | extend msg = tostring(parse_json(Log_s).mensaje)
-            | extend valor_str = extract(@"(-?\d+\.?\d*)$", 1, msg)
-            | extend valor = todouble(valor_str)
-            | top 1 by TimeGenerated desc
-            | extend anomalia = valor_str == "" or valor_str == "NaN" or isnull(valor) or valor <= 0 or valor >= umbral_valor_max
-            | project iif(anomalia, 1, 0)
-        )
-    };
-
-    let pred_tph = evaluar_prediccion("tph prediction");
-    let pred_concol = evaluar_prediccion("concol prediction");
-    let pred_flow = evaluar_prediccion("flow prediction");
-
-    print
-        Tags = iff(tags_problema == 1, "Alertar", "No alertar"),
-        Transformacion = iff(job01_fallas == 1 or job02_fallas == 1, "Alertar", "No alertar"),
-        Prediccion = iff(pred_tph == 1 or pred_concol == 1 or pred_flow == 1, "Alertar", "No alertar")
-    | extend EstadoGlobal = iff(Tags == "Alertar" or Transformacion == "Alertar" or Prediccion == "Alertar", "Alertar", "No alertar")
+    estados
+    | summarize estado = take_any(estado) by dominio
+    | evaluate pivot(dominio, take_any(estado))
+    | project
+        NotPII_Interpolated = column_ifexists("NotPII_Interpolated", "No alertar"),
+        Tags = column_ifexists("Tags", "No alertar"),
+        Transformacion = column_ifexists("Transformacion", "No alertar"),
+        Prediccion = column_ifexists("Prediccion", "No alertar")
+    | extend EstadoGlobal = iff(
+        NotPII_Interpolated == "Alertar" or Tags == "Alertar" or Transformacion == "Alertar" or Prediccion == "Alertar",
+        "Alertar",
+        "No alertar"
+    )
     | extend color = iff(EstadoGlobal == "Alertar", "#E53935", "#EAF4EA")
 };
