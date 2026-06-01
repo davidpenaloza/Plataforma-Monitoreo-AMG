@@ -1,0 +1,22 @@
+let fn_uat_mlp_svfn_dom_resumen_status = (startTime:datetime, endTime:datetime) {
+    let estados = union
+        (fn_uat_mlp_svfn_dom_fuente_notpii_interpolated_status(startTime, endTime)),
+        (fn_uat_mlp_svfn_dom_tags_status(startTime, endTime)),
+        (fn_uat_mlp_svfn_dom_transformacion_status(startTime, endTime)),
+        (fn_uat_mlp_svfn_dom_prediccion_status(startTime, endTime));
+
+    estados
+    | summarize estado = take_any(estado) by dominio
+    | evaluate pivot(dominio, take_any(estado))
+    | project
+        NotPII_Interpolated = column_ifexists("NotPII_Interpolated", "No alertar"),
+        Tags = column_ifexists("Tags", "No alertar"),
+        Transformacion = column_ifexists("Transformacion", "No alertar"),
+        Prediccion = column_ifexists("Prediccion", "No alertar")
+    | extend EstadoGlobal = iff(
+        NotPII_Interpolated == "Alertar" or Tags == "Alertar" or Transformacion == "Alertar" or Prediccion == "Alertar",
+        "Alertar",
+        "No alertar"
+    )
+    | extend color = iff(EstadoGlobal == "Alertar", "#E53935", "#EAF4EA")
+};

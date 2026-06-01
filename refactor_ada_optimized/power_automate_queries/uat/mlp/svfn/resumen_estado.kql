@@ -1,0 +1,13 @@
+// Resumen operativo para SENSOR VIRTUAL FLUJO NaSH (SVFN) en MLP UAT.
+let lookback = 1h;
+let resumen = fn_uat_mlp_svfn_dom_resumen_status(ago(lookback), now());
+
+union
+    (resumen | project orden = 1, producto = "NotPII_Interpolated", estado = NotPII_Interpolated),
+    (resumen | project orden = 2, producto = "Tags", estado = Tags),
+    (resumen | project orden = 3, producto = "Transformacion", estado = Transformacion),
+    (resumen | project orden = 4, producto = "Prediccion", estado = Prediccion)
+| extend color = iff(estado == "Alertar", "#E53935", "#EAF4EA")
+| extend icono = iff(estado == "Alertar", "🔴", "🟢")
+| project orden, producto, estado, color, icono
+| order by orden asc

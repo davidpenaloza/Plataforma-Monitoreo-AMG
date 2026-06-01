@@ -1,0 +1,27 @@
+let fn_uat_mlp_svfn_dom_prediccion_status = (startTime:datetime, endTime:datetime) {
+    let ventana_tags = 5m;
+    let umbral_valor_max = 15000.0;
+
+    let evaluar_prediccion = (patron:string) {
+        toscalar(
+            fn_src_mlp_uat_ws_svfn("ContainerAppConsoleLogs_CL", endTime - ventana_tags, endTime)
+            | where ContainerGroupName_s startswith "mlp-uat-caj-svfn-job02"
+            | where Log_s contains patron
+            | extend msg = tostring(parse_json(Log_s).mensaje)
+            | extend valor_str = extract(@"(-?\d+\.?\d*)$", 1, msg)
+            | extend valor = todouble(valor_str)
+            | top 1 by TimeGenerated desc
+            | extend anomalia = valor_str == "" or valor_str == "NaN" or isnull(valor) or valor <= 0 or valor >= umbral_valor_max
+            | project iif(anomalia, 1, 0)
+        )
+    };
+
+    let pred_tph = evaluar_prediccion("tph prediction");
+    let pred_concol = evaluar_prediccion("concol prediction");
+    let pred_flow = evaluar_prediccion("flow prediction");
+
+    print
+        dominio = "Prediccion",
+        estado = iff(pred_tph == 1 or pred_concol == 1 or pred_flow == 1, "Alertar", "No alertar")
+    | extend color = iff(estado == "Alertar", "#E53935", "#EAF4EA")
+};
