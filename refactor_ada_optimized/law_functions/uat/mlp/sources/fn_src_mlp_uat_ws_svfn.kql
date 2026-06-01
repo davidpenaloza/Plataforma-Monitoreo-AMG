@@ -1,0 +1,15 @@
+let fn_src_mlp_uat_ws_svfn = (sourceType:string, startTime:datetime, endTime:datetime) {
+  union isfuzzy=true
+    (
+      workspace("/subscriptions/0d996eb2-802f-4ef8-8ae6-d385c74da7e6/resourceGroups/MLP-UAT-RG-SVFN/providers/Microsoft.OperationalInsights/workspaces/mlp-uat-law-svfn").table("ContainerAppSystemLogs_CL")
+      | where TimeGenerated between (startTime .. endTime)
+      | where sourceType == "ContainerAppSystemLogs_CL"
+      | extend source_table = "ContainerAppSystemLogs_CL"
+    ),
+    (
+      workspace("/subscriptions/0d996eb2-802f-4ef8-8ae6-d385c74da7e6/resourceGroups/MLP-UAT-RG-SVFN/providers/Microsoft.OperationalInsights/workspaces/mlp-uat-law-svfn").table("ContainerAppConsoleLogs_CL")
+      | where TimeGenerated between (startTime .. endTime)
+      | where sourceType == "ContainerAppConsoleLogs_CL"
+      | extend source_table = "ContainerAppConsoleLogs_CL"
+    )
+};

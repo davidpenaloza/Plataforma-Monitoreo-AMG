@@ -39,6 +39,7 @@ REQUIRED_DOMAINS = {
     "fn_prd_mlp_notpii_dom_ingesta_status",
     "fn_prd_mlp_notpii_dom_global_status",
     "fn_prd_mlp_ssag_dom_resumen_status",
+    "fn_uat_mlp_svfn_dom_resumen_status",
 }
 
 REQUIRED_WRAPPERS = {
