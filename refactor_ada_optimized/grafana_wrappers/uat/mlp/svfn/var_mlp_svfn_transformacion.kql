@@ -1,0 +1,3 @@
+fn_uat_mlp_svfn_dom_resumen_status(bin($__timeFrom, 1m), bin($__timeTo, 1m))
+| project color = iff(Transformacion == "Alertar", "#E53935", "#EAF4EA")
+| take 1
