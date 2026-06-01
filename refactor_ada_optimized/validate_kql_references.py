@@ -161,14 +161,15 @@ for path in all_files:
         if call not in func_defs:
             errors.append(f"Undefined call: {call} referenced in {path.relative_to(ROOT)}")
 
-# Ensure wrappers call exactly one function and it's a required domain function
+# Ensure wrappers call exactly one domain/detail function; color helpers are allowed.
 for path in wrapper_files:
     text = path.read_text(encoding="utf-8")
     calls = sorted(set(CALL_RE.findall(text)))
-    if len(calls) != 1:
-        errors.append(f"Wrapper must call exactly one function: {path.name} has {calls}")
+    domain_calls = [c for c in calls if c != "fn_mon_status_to_color"]
+    if len(domain_calls) != 1:
+        errors.append(f"Wrapper must call exactly one domain/detail function: {path.name} has {calls}")
     else:
-        fn = calls[0]
+        fn = domain_calls[0]
         allowed_extra = ALLOWED_NON_DOMAIN_WRAPPERS.get(path.name, set())
         if fn not in REQUIRED_DOMAINS and fn not in allowed_extra:
             errors.append(f"Wrapper {path.name} points to non-domain function: {fn}")

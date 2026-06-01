@@ -19,9 +19,6 @@ let fn_uat_mlp_svfn_dom_prediccion_status = (startTime:datetime, endTime:datetim
     let pred_tph = evaluar_prediccion("tph prediction");
     let pred_concol = evaluar_prediccion("concol prediction");
     let pred_flow = evaluar_prediccion("flow prediction");
-
-    print
-        dominio = "Prediccion",
-        estado = iff(pred_tph == 1 or pred_concol == 1 or pred_flow == 1, "Alertar", "No alertar")
-    | extend color = iff(estado == "Alertar", "#E53935", "#EAF4EA")
+    let status = iff(pred_tph == 1 or pred_concol == 1 or pred_flow == 1, "ALERT", "OK");
+    print status
 };

@@ -855,7 +855,7 @@
         "options": [],
         "query": {
           "azureLogAnalytics": {
-            "query": "fn_uat_mlp_svfn_dom_resumen_status(bin($__timeFrom, 1m), bin($__timeTo, 1m))\n| project color\n| take 1",
+            "query": "fn_uat_mlp_svfn_dom_resumen_status(bin($__timeFrom, 1m), bin($__timeTo, 1m))\n| project color = fn_mon_status_to_color(print_0)\n| take 1",
             "resources": [
               "/subscriptions/0d996eb2-802f-4ef8-8ae6-d385c74da7e6/resourceGroups/MLP-UAT-RG-SVFN/providers/Microsoft.OperationalInsights/workspaces/mlp-uat-law-svfn"
             ]
@@ -887,7 +887,7 @@
         "options": [],
         "query": {
           "azureLogAnalytics": {
-            "query": "fn_uat_mlp_svfn_dom_tags_status(bin($__timeFrom, 1m), bin($__timeTo, 1m))\n| project color\n| take 1",
+            "query": "fn_uat_mlp_svfn_dom_tags_status(bin($__timeFrom, 1m), bin($__timeTo, 1m))\n| project color = fn_mon_status_to_color(print_0)\n| take 1",
             "resources": [
               "/subscriptions/0d996eb2-802f-4ef8-8ae6-d385c74da7e6/resourceGroups/MLP-UAT-RG-SVFN/providers/Microsoft.OperationalInsights/workspaces/mlp-uat-law-svfn"
             ]
@@ -919,7 +919,7 @@
         "options": [],
         "query": {
           "azureLogAnalytics": {
-            "query": "fn_uat_mlp_svfn_dom_transformacion_status(bin($__timeFrom, 1m), bin($__timeTo, 1m))\n| project color\n| take 1",
+            "query": "fn_uat_mlp_svfn_dom_transformacion_status(bin($__timeFrom, 1m), bin($__timeTo, 1m))\n| project color = fn_mon_status_to_color(print_0)\n| take 1",
             "resources": [
               "/subscriptions/0d996eb2-802f-4ef8-8ae6-d385c74da7e6/resourceGroups/MLP-UAT-RG-SVFN/providers/Microsoft.OperationalInsights/workspaces/mlp-uat-law-svfn"
             ]
@@ -951,7 +951,7 @@
         "options": [],
         "query": {
           "azureLogAnalytics": {
-            "query": "fn_uat_mlp_svfn_dom_prediccion_status(bin($__timeFrom, 1m), bin($__timeTo, 1m))\n| project color\n| take 1",
+            "query": "fn_uat_mlp_svfn_dom_prediccion_status(bin($__timeFrom, 1m), bin($__timeTo, 1m))\n| project color = fn_mon_status_to_color(print_0)\n| take 1",
             "resources": [
               "/subscriptions/0d996eb2-802f-4ef8-8ae6-d385c74da7e6/resourceGroups/MLP-UAT-RG-SVFN/providers/Microsoft.OperationalInsights/workspaces/mlp-uat-law-svfn"
             ]
@@ -983,7 +983,7 @@
         "options": [],
         "query": {
           "azureLogAnalytics": {
-            "query": "fn_uat_mlp_svfn_dom_fuente_notpii_interpolated_status(bin($__timeFrom, 1m), bin($__timeTo, 1m))\n| project color\n| take 1",
+            "query": "fn_uat_mlp_svfn_dom_fuente_notpii_interpolated_status(bin($__timeFrom, 1m), bin($__timeTo, 1m))\n| project color = fn_mon_status_to_color(print_0)\n| take 1",
             "resources": [
               "/subscriptions/0d996eb2-802f-4ef8-8ae6-d385c74da7e6/resourceGroups/MLP-UAT-RG-SVFN/providers/Microsoft.OperationalInsights/workspaces/mlp-uat-law-svfn"
             ]

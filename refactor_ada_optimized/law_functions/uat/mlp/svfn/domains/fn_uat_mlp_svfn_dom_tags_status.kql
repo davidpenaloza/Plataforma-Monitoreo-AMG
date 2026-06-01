@@ -16,8 +16,6 @@ let fn_uat_mlp_svfn_dom_tags_status = (startTime:datetime, endTime:datetime) {
         | summarize max(iif(problema, 1, 0))
     );
 
-    print
-        dominio = "Tags",
-        estado = iff(tags_problema == 1, "Alertar", "No alertar")
-    | extend color = iff(estado == "Alertar", "#E53935", "#EAF4EA")
+    let status = iff(tags_problema == 1, "ALERT", "OK");
+    print status
 };

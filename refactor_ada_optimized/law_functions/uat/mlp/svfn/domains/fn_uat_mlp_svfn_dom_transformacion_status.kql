@@ -21,9 +21,6 @@ let fn_uat_mlp_svfn_dom_transformacion_status = (startTime:datetime, endTime:dat
 
     let job01_fallas = evaluar_fallas_recientes("mlp-uat-caj-svfn-job01");
     let job02_fallas = evaluar_fallas_recientes("mlp-uat-caj-svfn-job02");
-
-    print
-        dominio = "Transformacion",
-        estado = iff(job01_fallas == 1 or job02_fallas == 1, "Alertar", "No alertar")
-    | extend color = iff(estado == "Alertar", "#E53935", "#EAF4EA")
+    let status = iff(job01_fallas == 1 or job02_fallas == 1, "ALERT", "OK");
+    print status
 };
