@@ -1,0 +1,21 @@
+let fn_uat_mlp_svfn_dom_tags_status = (startTime:datetime, endTime:datetime) {
+    let ventana_tags = 5m;
+    let umbral_valor_max = 15000.0;
+
+    let tags_problema = toscalar(
+        fn_src_mlp_uat_ws_svfn("ContainerAppConsoleLogs_CL", endTime - ventana_tags, endTime)
+        | where ContainerGroupName_s startswith "mlp-uat-caj-svfn-job02"
+        | where Log_s contains "Last values saved in cache"
+        | top 1 by TimeGenerated desc
+        | extend dict_text = extract(@"\{(.+)\}", 1, tostring(Log_s))
+        | extend pairs = split(dict_text, ",")
+        | mv-expand pair = pairs
+        | extend valor = extract(@"':\s*'([^']+)'", 1, tostring(pair))
+        | extend valor_num = todouble(valor)
+        | extend problema = valor == "" or valor == "NaN" or valor == "null" or isnull(valor_num) or valor_num <= 0 or valor_num >= umbral_valor_max
+        | summarize max(iif(problema, 1, 0))
+    );
+
+    let status = iff(tags_problema == 1, "ALERT", "OK");
+    print status
+};

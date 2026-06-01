@@ -1,0 +1,12 @@
+let fn_uat_ant_mtsa_dom_resumen_status = (startTime:datetime, endTime:datetime) {
+    let ingestas = toscalar(fn_uat_ant_mtsa_dom_ingestas_status(startTime, endTime));
+    let regla_negocio = toscalar(fn_uat_ant_mtsa_dom_regla_negocio_status(startTime, endTime));
+    let procesamiento = toscalar(fn_uat_ant_mtsa_dom_procesamiento_status(startTime, endTime));
+    let frontend = toscalar(fn_uat_ant_mtsa_dom_frontend_status(startTime, endTime));
+    let status = iff(
+        ingestas == "ALERT" or regla_negocio == "ALERT" or procesamiento == "ALERT" or frontend == "ALERT",
+        "ALERT",
+        "OK"
+    );
+    print status
+};

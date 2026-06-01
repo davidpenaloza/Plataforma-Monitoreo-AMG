@@ -1,0 +1,11 @@
+let fn_uat_ant_mtsa_dom_regla_negocio_status = (startTime:datetime, endTime:datetime) {
+    let alertas = toscalar(
+        fn_src_ant_uat_ws_dataplatform("Logs_ANT_Mineral_Tracking_datamart_CL", startTime, endTime)
+        | where subtype contains "Calidad de datos" and product_origin == "SIRO Acido"
+        | summarize alertas = countif(alertar == true and (description contains "Diferencia" or description contains "Demora"))
+        | project alertas
+    );
+
+    let status = iff(coalesce(alertas, 0) > 0, "ALERT", "OK");
+    print status
+};
