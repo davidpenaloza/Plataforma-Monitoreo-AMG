@@ -39,6 +39,11 @@ REQUIRED_DOMAINS = {
     "fn_prd_mlp_notpii_dom_ingesta_status",
     "fn_prd_mlp_notpii_dom_global_status",
     "fn_prd_mlp_ssag_dom_resumen_status",
+    "fn_uat_mlp_svfn_dom_fuente_notpii_interpolated_status",
+    "fn_uat_mlp_svfn_dom_tags_status",
+    "fn_uat_mlp_svfn_dom_transformacion_status",
+    "fn_uat_mlp_svfn_dom_prediccion_status",
+    "fn_uat_mlp_svfn_dom_resumen_status",
 }
 
 REQUIRED_WRAPPERS = {
@@ -59,6 +64,12 @@ REQUIRED_WRAPPERS = {
     "var_mlp_notpii_ingesta.kql",
     "var_mlp_notpii_difusion_global.kql",
     "var_mlp_sirosag_resumen.kql",
+    "var_mlp_svfn_resumen.kql",
+    "var_mlp_svfn_global.kql",
+    "var_mlp_svfn_fuente_notpii_interpolated.kql",
+    "var_mlp_svfn_tags.kql",
+    "var_mlp_svfn_transformacion.kql",
+    "var_mlp_svfn_prediccion.kql",
 }
 
 ALLOWED_NON_DOMAIN_WRAPPERS = {
@@ -150,14 +161,15 @@ for path in all_files:
         if call not in func_defs:
             errors.append(f"Undefined call: {call} referenced in {path.relative_to(ROOT)}")
 
-# Ensure wrappers call exactly one function and it's a required domain function
+# Ensure wrappers call exactly one domain/detail function; color helpers are allowed.
 for path in wrapper_files:
     text = path.read_text(encoding="utf-8")
     calls = sorted(set(CALL_RE.findall(text)))
-    if len(calls) != 1:
-        errors.append(f"Wrapper must call exactly one function: {path.name} has {calls}")
+    domain_calls = [c for c in calls if c != "fn_mon_status_to_color"]
+    if len(domain_calls) != 1:
+        errors.append(f"Wrapper must call exactly one domain/detail function: {path.name} has {calls}")
     else:
-        fn = calls[0]
+        fn = domain_calls[0]
         allowed_extra = ALLOWED_NON_DOMAIN_WRAPPERS.get(path.name, set())
         if fn not in REQUIRED_DOMAINS and fn not in allowed_extra:
             errors.append(f"Wrapper {path.name} points to non-domain function: {fn}")
