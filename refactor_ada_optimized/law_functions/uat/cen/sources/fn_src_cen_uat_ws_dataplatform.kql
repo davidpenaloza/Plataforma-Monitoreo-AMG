@@ -1,0 +1,21 @@
+let fn_src_cen_uat_ws_dataplatform = (sourceType:string, startTime:datetime, endTime:datetime) {
+  union isfuzzy=true
+    (
+      workspace("/subscriptions/0d996eb2-802f-4ef8-8ae6-d385c74da7e6/resourceGroups/ams-uat-dataplatform-rg/providers/Microsoft.OperationalInsights/workspaces/ams-uat-dataplatform-laws").table("Logs_ANT_Mineral_Tracking_datamart_CL")
+      | where TimeGenerated between (startTime .. endTime)
+      | where sourceType == "Logs_ANT_Mineral_Tracking_datamart_CL"
+      | extend source_table = "Logs_ANT_Mineral_Tracking_datamart_CL"
+    ),
+    (
+      workspace("/subscriptions/0d996eb2-802f-4ef8-8ae6-d385c74da7e6/resourceGroups/ams-uat-dataplatform-rg/providers/Microsoft.OperationalInsights/workspaces/ams-uat-dataplatform-laws").table("DatabricksJobs")
+      | where TimeGenerated between (startTime .. endTime)
+      | where sourceType == "DatabricksJobs"
+      | extend source_table = "DatabricksJobs"
+    ),
+    (
+      workspace("/subscriptions/0d996eb2-802f-4ef8-8ae6-d385c74da7e6/resourceGroups/ams-uat-dataplatform-rg/providers/Microsoft.OperationalInsights/workspaces/ams-uat-dataplatform-laws").table("AppServiceHTTPLogs")
+      | where TimeGenerated between (startTime .. endTime)
+      | where sourceType == "AppServiceHTTPLogs"
+      | extend source_table = "AppServiceHTTPLogs"
+    )
+};

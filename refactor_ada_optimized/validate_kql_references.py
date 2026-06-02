@@ -49,6 +49,12 @@ REQUIRED_DOMAINS = {
     "fn_uat_ant_mtsa_dom_procesamiento_status",
     "fn_uat_ant_mtsa_dom_regla_negocio_status",
     "fn_uat_ant_mtsa_dom_ingestas_status",
+    "fn_uat_cen_minco_sm_dom_ingestas_status",
+    "fn_uat_cen_minco_sm_dom_regla_negocio_status",
+    "fn_uat_cen_minco_sm_dom_procesamiento_status",
+    "fn_uat_cen_minco_sm_dom_frontend_status",
+    "fn_uat_cen_minco_sm_dom_resumen_status",
+    "fn_uat_cen_minco_sm_dom_global_status",
 }
 
 REQUIRED_WRAPPERS = {
@@ -81,6 +87,12 @@ REQUIRED_WRAPPERS = {
     "var_ant_mtsa_ingestas.kql",
     "var_ant_mtsa_global.kql",
     "var_ant_mtsa_resumen.kql",
+    "var_cen_minco_sm_ingestas.kql",
+    "var_cen_minco_sm_regla_negocio.kql",
+    "var_cen_minco_sm_procesamiento.kql",
+    "var_cen_minco_sm_frontend.kql",
+    "var_cen_minco_sm_resumen.kql",
+    "var_cen_minco_sm_global.kql",
 }
 
 ALLOWED_NON_DOMAIN_WRAPPERS = {

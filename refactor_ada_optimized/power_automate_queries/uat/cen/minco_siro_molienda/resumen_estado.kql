@@ -1,0 +1,24 @@
+// Ventana de observación estándar para MINCO - Siro Molienda (Centinela).
+let startTime = ago(3h);
+let endTime = now();
+let ingestas = toscalar(fn_uat_cen_minco_sm_dom_ingestas_status(startTime, endTime));
+let regla_negocio = toscalar(fn_uat_cen_minco_sm_dom_regla_negocio_status(startTime, endTime));
+let procesamiento = toscalar(fn_uat_cen_minco_sm_dom_procesamiento_status(startTime, endTime));
+let frontend = toscalar(fn_uat_cen_minco_sm_dom_frontend_status(startTime, endTime));
+let resumen = toscalar(fn_uat_cen_minco_sm_dom_resumen_status(startTime, endTime));
+
+union
+    (print orden = 1, producto = "MINCO - Siro Molienda / Global", estado = resumen),
+    (print orden = 2, producto = "Ingestas", estado = ingestas),
+    (print orden = 3, producto = "Regla de negocio", estado = regla_negocio),
+    (print orden = 4, producto = "Procesamiento", estado = procesamiento),
+    (print orden = 5, producto = "Frontend", estado = frontend)
+| extend color = fn_mon_status_to_color(estado)
+| extend icono = case(
+    estado == "ALERT", "🔴",
+    estado in ("WARN", "WARNING"), "🟡",
+    estado == "OK", "🟢",
+    "⚪"
+)
+| project orden, producto, estado, color, icono
+| order by orden asc

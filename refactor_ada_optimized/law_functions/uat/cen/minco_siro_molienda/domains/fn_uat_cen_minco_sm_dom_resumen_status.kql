@@ -1,0 +1,8 @@
+let fn_uat_cen_minco_sm_dom_resumen_status = (startTime:datetime, endTime:datetime) {
+    let ingestas = toscalar(fn_uat_cen_minco_sm_dom_ingestas_status(startTime, endTime));
+    let regla_negocio = toscalar(fn_uat_cen_minco_sm_dom_regla_negocio_status(startTime, endTime));
+    let procesamiento = toscalar(fn_uat_cen_minco_sm_dom_procesamiento_status(startTime, endTime));
+    let frontend = toscalar(fn_uat_cen_minco_sm_dom_frontend_status(startTime, endTime));
+    let status = fn_uat_cen_minco_sm_status_rollup(pack_array(ingestas, regla_negocio, procesamiento, frontend));
+    print status
+};
