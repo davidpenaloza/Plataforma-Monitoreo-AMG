@@ -1,0 +1,26 @@
+let fn_uat_mlp_svfn_dom_transformacion_status = (startTime:datetime, endTime:datetime) {
+    let ventana_jobs = 1h;
+    let umbral_fallas_transformacion = 60;
+
+    let evaluar_fallas_recientes = (jobname:string) {
+        toscalar(
+            fn_src_mlp_uat_ws_svfn("ContainerAppSystemLogs_CL", endTime - ventana_jobs, endTime)
+            | where JobName_s == jobname
+            | where Reason_s in ("Completed", "FailedCreate", "DeadlineExceeded", "BackoffLimitExceeded", "KEDAJobMetricInactive")
+            | project TimeGenerated, estado = case(
+                Reason_s == "Completed", "OK",
+                Reason_s in ("FailedCreate", "DeadlineExceeded", "BackoffLimitExceeded", "KEDAJobMetricInactive"), "FAIL",
+                "OTHER"
+            )
+            | order by TimeGenerated desc
+            | take umbral_fallas_transformacion
+            | summarize total = count(), fallas = countif(estado == "FAIL")
+            | project iif(total >= umbral_fallas_transformacion and fallas == umbral_fallas_transformacion, 1, 0)
+        )
+    };
+
+    let job01_fallas = evaluar_fallas_recientes("mlp-uat-caj-svfn-job01");
+    let job02_fallas = evaluar_fallas_recientes("mlp-uat-caj-svfn-job02");
+    let status = iff(job01_fallas == 1 or job02_fallas == 1, "ALERT", "OK");
+    print status
+};

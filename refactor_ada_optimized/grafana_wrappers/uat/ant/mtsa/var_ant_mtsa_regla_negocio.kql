@@ -1,0 +1,3 @@
+fn_uat_ant_mtsa_dom_regla_negocio_status(bin($__timeFrom, 1m), bin($__timeTo, 1m))
+| project color = fn_mon_status_to_color(print_0)
+| take 1

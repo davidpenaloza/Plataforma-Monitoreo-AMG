@@ -1,6 +1,8 @@
- let adaJobsAlarmAlert = toscalar(
+let fn_prd_mlp_ada_dom_alarm_status = (startTime:datetime, endTime:datetime) {
+let adaJobsAlarmAlert = toscalar(
     fn_prd_mlp_ada_jobs_status_detail(startTime, endTime)
     | where domain == "Alarmas"
+    | summarize arg_max(TimeGeneratedBin_Chile, isAlert) by jobName
     | summarize alertCount = countif(isAlert == true)
     | project alertCount > 0
     );
@@ -36,3 +38,4 @@ let error_conexion_storage = toscalar(
     );
 let status = iff(adaJobsAlarmAlert or incidentes_largos_alarmas > 0 or error_conexion_storage > 0, "ALERT", "OK");
 print status
+};
