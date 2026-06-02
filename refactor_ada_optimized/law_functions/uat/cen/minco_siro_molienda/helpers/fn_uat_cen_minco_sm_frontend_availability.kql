@@ -1,0 +1,7 @@
+let fn_uat_cen_minco_sm_frontend_availability = (startTime:datetime, endTime:datetime, minAvailabilityPct:real = 85.0, appNameContains:string = "") {
+    fn_src_cen_uat_ws_dataplatform("AppServiceHTTPLogs", startTime, endTime)
+    | where isempty(appNameContains) or _ResourceId contains appNameContains or CsHost contains appNameContains
+    | summarize TotalRequests = count(), SuccessfulRequests = countif(Result == "Success")
+    | extend AvailabilityPct = iff(TotalRequests == 0, 100.0, 100.0 * todouble(SuccessfulRequests) / todouble(TotalRequests))
+    | project Status = iff(AvailabilityPct < minAvailabilityPct, "ALERT", "OK"), AvailabilityPct, TotalRequests, SuccessfulRequests
+};

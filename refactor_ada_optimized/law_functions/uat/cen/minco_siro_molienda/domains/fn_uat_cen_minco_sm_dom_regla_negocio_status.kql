@@ -1,0 +1,8 @@
+let fn_uat_cen_minco_sm_dom_regla_negocio_status = (startTime:datetime, endTime:datetime) {
+    let product_origin_cfg = toscalar(fn_uat_cen_minco_sm_catalog() | where Key == "product_origin" | project Value);
+    let status = toscalar(
+        fn_uat_cen_minco_sm_alert_from_datamart(startTime, endTime, product_origin_cfg, "", "Calidad de datos", "", "")
+        | project Status
+    );
+    print status = coalesce(status, "OK")
+};

@@ -1,0 +1,19 @@
+let fn_uat_cen_minco_sm_databricks_task_status = (startTime:datetime, endTime:datetime, jobId:string, taskKeyContains:string, bucketSize:timespan = 30m) {
+    let runs = materialize(
+        fn_src_cen_uat_ws_dataplatform("DatabricksJobs", startTime, endTime)
+        | extend params = parse_json(RequestParams)
+        | where isempty(jobId) or tostring(params.jobId) == jobId
+        | where isempty(taskKeyContains) or tostring(params.taskKey) contains taskKeyContains
+        | where ActionName in ("runSucceeded", "runFailed")
+    );
+
+    let buckets = runs
+        | extend Intervalo = bin(TimeGenerated, bucketSize)
+        | summarize Fallidos = countif(ActionName == "runFailed"), Exitosos = countif(ActionName == "runSucceeded") by Intervalo;
+
+    buckets
+    | summarize TotalIntervalos = count(), IntervalosFallidos = countif(Fallidos > 0 and Exitosos == 0)
+    | project Status = iff(TotalIntervalos > 0 and IntervalosFallidos == TotalIntervalos, "ALERT", "OK"),
+              TotalIntervalos,
+              IntervalosFallidos
+};

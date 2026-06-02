@@ -1,0 +1,8 @@
+let fn_uat_cen_minco_sm_status_rollup = (statuses:dynamic) {
+  let has_alert = toscalar(
+    print statuses = statuses
+    | mv-expand status = statuses to typeof(string)
+    | summarize has_alert = max(iff(toupper(status) == "ALERT", 1, 0))
+  );
+  iff(coalesce(has_alert, 0) == 1, "ALERT", "OK")
+};

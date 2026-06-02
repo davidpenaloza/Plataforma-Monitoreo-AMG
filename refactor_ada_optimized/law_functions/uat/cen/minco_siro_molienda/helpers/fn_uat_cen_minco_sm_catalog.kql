@@ -1,0 +1,9 @@
+let fn_uat_cen_minco_sm_catalog = () {
+    datatable(Key:string, Value:string)
+    [
+        "product_origin", "SIRO Molienda",
+        "task_key_contains", "molienda",
+        "frontend_app_contains", "siro-molienda",
+        "datamart_detail_key", "table"
+    ]
+};

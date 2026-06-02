@@ -1,0 +1,3 @@
+let fn_uat_cen_minco_sm_dom_global_status = (startTime:datetime, endTime:datetime) {
+    fn_uat_cen_minco_sm_dom_resumen_status(startTime, endTime)
+};
