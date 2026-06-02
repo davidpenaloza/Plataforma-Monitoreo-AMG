@@ -1,0 +1,4 @@
+let fn_uat_cen_minco_sm_dom_procesamiento_features_status = (startTime:datetime, endTime:datetime) {
+    let status = toscalar(fn_uat_cen_minco_sm_status_dimensions(startTime, endTime) | project Procesamiento_Features);
+    print status
+};

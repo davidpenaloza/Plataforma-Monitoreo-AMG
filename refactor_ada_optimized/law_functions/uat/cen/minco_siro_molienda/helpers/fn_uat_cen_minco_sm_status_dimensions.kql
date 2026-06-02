@@ -1,0 +1,324 @@
+let fn_uat_cen_minco_sm_status_dimensions = (startTime:datetime, endTime:datetime) {
+    let startQuery = bin(startTime, 1m);
+    let endQuery = bin(endTime, 1m);
+
+    let pi_status = view () {
+        let mapContainerJobs = dynamic({
+            "cen-dev-caj-pisystem-job01": "job01_pisystem",
+            "cen-dev-caj-pisystem-job02": "job02_pisystem",
+            "cen-dev-caj-pisystem-job03": "job03_pisystem"
+        });
+
+        let mapUmbralAlerta = dynamic({
+            "cen-dev-caj-pisystem-job01": 25,
+            "cen-dev-caj-pisystem-job02": 25,
+            "cen-dev-caj-pisystem-job03": 60
+        });
+
+        let maxUmbral =
+            toscalar(
+                print m = mapUmbralAlerta
+                | mv-expand k = bag_keys(m)
+                | extend v = todouble(m[tostring(k)])
+                | summarize max(v)
+            );
+
+        let bins_expected_logs = view () {
+            range TimeGeneratedBin_Chile from startQuery - totimespan(maxUmbral * 60s) to endQuery step 1m
+            | extend TimeGeneratedBin_Chile = bin(TimeGeneratedBin_Chile, 1m)
+            | extend
+                ["expected_cen-dev-caj-pisystem-job01"] = 1,
+                ["expected_cen-dev-caj-pisystem-job02"] = iff(datetime_part("minute", TimeGeneratedBin_Chile) in (1,11,21,31,41,51), 1, 0),
+                ["expected_cen-dev-caj-pisystem-job03"] = iff(datetime_part("minute", TimeGeneratedBin_Chile) in (11,12,13,14,15), 1, 0)
+            | project TimeGeneratedBin_Chile, allValues = pack_all()
+            | mv-expand allValues
+            | extend nombreEsperado = tostring(bag_keys(allValues)[0])
+            | extend valorEsperado = toint(allValues[nombreEsperado])
+            | project-away allValues
+            | where nombreEsperado startswith "expected_"
+        };
+
+        let bins_real_data = view () {
+            fn_src_cen_dev_ws_pisystem("ContainerAppSystemLogs_CL", startQuery - totimespan(maxUmbral * 60s), endQuery)
+            | where Log_s has "has successfully completed"
+            | where JobName_s in ("cen-dev-caj-pisystem-job01", "cen-dev-caj-pisystem-job02", "cen-dev-caj-pisystem-job03")
+            | project TimeGenerated, nombreReal = JobName_s, valorReal = 1
+            | summarize valorReal = sum(valorReal) by nombreReal, TimeGeneratedBin_Chile = bin(TimeGenerated, 1m)
+            | extend nombreEsperado = strcat("expected_", nombreReal)
+        };
+
+        let join_std_data =
+            bins_expected_logs
+            | join kind=leftouter (bins_real_data) on TimeGeneratedBin_Chile, nombreEsperado
+            | project-away TimeGeneratedBin_Chile1, nombreEsperado1
+            | extend nombreReal = replace_string(nombreEsperado, "expected_", "")
+            | extend valorReal = coalesce(valorReal, 0);
+
+        let valoresAcumulados =
+            join_std_data
+            | extend umbralAlerta = toint(mapUmbralAlerta[nombreReal])
+            | extend rango = range(TimeGeneratedBin_Chile, TimeGeneratedBin_Chile + totimespan(umbralAlerta * 60s), 1m)
+            | mv-expand rango to typeof(datetime)
+            | summarize valorAccReal = sum(valorReal), valorAccEsperado = sum(valorEsperado) by TimeGeneratedBin_Chile = rango, nombreReal
+            | where TimeGeneratedBin_Chile < endQuery
+            | extend status = iff(valorAccReal == 0 and valorAccEsperado != 0, "a", "-");
+
+        join_std_data
+        | join kind=leftouter valoresAcumulados on TimeGeneratedBin_Chile, nombreReal
+        | summarize
+            status = iff(countif(status == "a") > 0, "a", "-"),
+            valorReal = sum(valorReal),
+            valorEsperado = sum(valorEsperado)
+          by TimeGeneratedBin_Chile = bin(TimeGeneratedBin_Chile, 15m), nombreReal
+        | extend status = case(
+            valorEsperado == 0, "n",
+            status == "a", "a",
+            valorReal > valorEsperado, "s",
+            valorReal < ceiling(0.85 * valorEsperado), "w",
+            "n")
+        | extend status = strcat(status, valorReal, "/", valorEsperado)
+        | extend nombreReal = tostring(mapContainerJobs[nombreReal])
+        | evaluate pivot(nombreReal, take_any(status), TimeGeneratedBin_Chile)
+        | project TimeGeneratedBin_Chile, job01_pisystem, job02_pisystem, job03_pisystem
+    };
+
+    let mt_job_name = "cen-dev-caj-mt-job01";
+    let mt_slot = 15m;
+    let mt_grace = 12m;
+    let mt_ingest_lag = 3m;
+    let mt_curr_slot = bin(endQuery, 15m);
+    let mt_grace_end = mt_curr_slot + mt_grace;
+
+    let mt_curr_completions =
+        fn_src_cen_dev_ws_mt("ContainerAppSystemLogs_CL", mt_curr_slot, mt_curr_slot + mt_slot + mt_ingest_lag)
+        | where JobName_s == mt_job_name
+        | where Log_s has "has successfully completed"
+        | summarize completions = count();
+
+    let mt_alert_row =
+        mt_curr_completions
+        | extend completions = toint(coalesce(completions, 0))
+        | extend dentro_gracia_o_lag = endQuery < (mt_grace_end + mt_ingest_lag)
+        | extend estado_mt = case(
+            dentro_gracia_o_lag, "n",
+            completions == 0, "a",
+            "n")
+        | project Ingesta_MT = iff(estado_mt == "a", "Critical", "OK");
+
+    let pi_alert_row =
+        pi_status()
+        | summarize Ingesta_PISystem = iff(any(job01_pisystem startswith "a" or job02_pisystem startswith "a" or job03_pisystem startswith "a"), "Critical", "OK")
+          by bin(TimeGeneratedBin_Chile, 15m)
+        | sort by TimeGeneratedBin_Chile desc
+        | project Ingesta_PISystem
+        | take 1;
+
+    let alerta_pi_mt =
+        pi_alert_row
+        | extend k = 1
+        | join kind=inner (mt_alert_row | extend k = 1) on k
+        | project-away k;
+
+    let statusDominiosSmol = view() {
+        let mapContainerJobs = dynamic({
+            "cen-uat-caj-smol-job01": "Job01_PI_10m",
+            "cen-uat-caj-smol-job02": "Job02_PI_1h",
+            "cen-uat-caj-smol-job03": "Job03_MT",
+            "cen-uat-caj-smol-job04": "Job04_Merge",
+            "cen-uat-caj-smol-job05": "Job05_Feat",
+            "cen-uat-caj-smol-job06": "Job06_Opt",
+            "cen-uat-caj-smol-job07": "Job07_Train"
+        });
+
+        let mapUmbralAlerta_0105 = dynamic({
+            "cen-uat-caj-smol-job01": 1,
+            "cen-uat-caj-smol-job02": 1,
+            "cen-uat-caj-smol-job03": 3,
+            "cen-uat-caj-smol-job04": 1,
+            "cen-uat-caj-smol-job05": 1
+        });
+
+        let maxUmbral =
+            toscalar(
+                print m = mapUmbralAlerta_0105
+                | mv-expand k = bag_keys(m)
+                | extend v = todouble(m[tostring(k)])
+                | summarize max(v)
+            );
+
+        let get_container_sources_data = view() {
+            let bins_expected_logs = view() {
+                range TimeGeneratedBin_Chile from startQuery - totimespan(maxUmbral * 60s) to endQuery step 1m
+                | extend TimeGeneratedBin_Chile = bin(TimeGeneratedBin_Chile, 1m)
+                | extend
+                    ["expected_cen-uat-caj-smol-job01"] = 1,
+                    ["expected_cen-uat-caj-smol-job02"] = 1,
+                    ["expected_cen-uat-caj-smol-job03"] = iff(datetime_part("minute", TimeGeneratedBin_Chile) % 5 == 0, 1, 0),
+                    ["expected_cen-uat-caj-smol-job04"] = 1,
+                    ["expected_cen-uat-caj-smol-job05"] = 1
+                | project TimeGeneratedBin_Chile, allValues = pack_all()
+                | mv-expand allValues
+                | extend nombreEsperado = tostring(bag_keys(allValues)[0])
+                | extend valorEsperado = toint(allValues[nombreEsperado])
+                | project-away allValues
+                | where nombreEsperado startswith "expected_"
+            };
+
+            let bins_real_data = view() {
+                fn_src_cen_uat_ws_smol("ContainerAppSystemLogs_CL", startQuery - totimespan(maxUmbral * 60s), endQuery)
+                | where JobName_s in (
+                    "cen-uat-caj-smol-job01",
+                    "cen-uat-caj-smol-job02",
+                    "cen-uat-caj-smol-job03",
+                    "cen-uat-caj-smol-job04",
+                    "cen-uat-caj-smol-job05")
+                | where Log_s contains "has successfully completed"
+                | project TimeGenerated, nombreReal = JobName_s, valorReal = 1
+                | summarize valorReal = sum(valorReal) by nombreReal, TimeGeneratedBin_Chile = bin(TimeGenerated, 1m)
+                | extend nombreEsperado = strcat("expected_", nombreReal)
+            };
+
+            bins_expected_logs
+            | join kind=leftouter (bins_real_data) on TimeGeneratedBin_Chile, nombreEsperado
+            | project-away TimeGeneratedBin_Chile1, nombreEsperado1
+            | extend nombreReal = replace_string(nombreEsperado, "expected_", "")
+            | extend valorReal = coalesce(valorReal, 0)
+        };
+
+        let valoresAcumulados = view() {
+            get_container_sources_data
+            | extend umbralAlerta = toint(mapUmbralAlerta_0105[nombreReal])
+            | extend rango = range(TimeGeneratedBin_Chile, TimeGeneratedBin_Chile + totimespan(umbralAlerta * 60s), 1m)
+            | mv-expand rango to typeof(datetime)
+            | summarize valorAccReal = sum(valorReal), valorAccEsperado = sum(valorEsperado) by TimeGeneratedBin_Chile = rango, nombreReal
+            | where TimeGeneratedBin_Chile < endQuery
+            | extend status = iff(valorAccReal == 0 and valorAccEsperado != 0, "a", "-")
+        };
+
+        let result_0105_raw =
+            get_container_sources_data
+            | join kind=leftouter valoresAcumulados on TimeGeneratedBin_Chile, nombreReal
+            | summarize
+                status = iff(countif(status == "a") > 0, "a", "-"),
+                valorReal = sum(valorReal),
+                valorEsperado = sum(valorEsperado)
+              by TimeGeneratedBin_Chile = bin(TimeGeneratedBin_Chile, 15m), nombreReal
+            | extend status = case(
+                valorEsperado == 0, "n",
+                status == "a", "a",
+                valorReal > valorEsperado, "s",
+                valorReal < ceiling(0.85 * valorEsperado), "w",
+                "n")
+            | extend status = strcat(status, valorReal, "/", valorEsperado)
+            | extend nombreReal = tostring(mapContainerJobs[nombreReal])
+            | evaluate pivot(nombreReal, take_any(status), TimeGeneratedBin_Chile)
+            | project TimeGeneratedBin_Chile, Job01_PI_10m, Job02_PI_1h, Job03_MT, Job04_Merge, Job05_Feat;
+
+        let lastSlot = toscalar(result_0105_raw | summarize max(TimeGeneratedBin_Chile));
+
+        let result_0105 =
+            result_0105_raw
+            | extend is_last = TimeGeneratedBin_Chile == lastSlot
+            | extend Job01_PI_10m = iif(is_last and Job01_PI_10m startswith "w", strcat("n", substring(Job01_PI_10m, 1)), Job01_PI_10m)
+            | extend Job02_PI_1h = iif(is_last and Job02_PI_1h startswith "w", strcat("n", substring(Job02_PI_1h, 1)), Job02_PI_1h)
+            | extend Job03_MT = iif(is_last and Job03_MT startswith "w", strcat("n", substring(Job03_MT, 1)), Job03_MT)
+            | extend Job04_Merge = iif(is_last and Job04_Merge startswith "w", strcat("n", substring(Job04_Merge, 1)), Job04_Merge)
+            | extend Job05_Feat = iif(is_last and Job05_Feat startswith "w", strcat("n", substring(Job05_Feat, 1)), Job05_Feat)
+            | project TimeGeneratedBin_Chile, Job01_PI_10m, Job02_PI_1h, Job03_MT, Job04_Merge, Job05_Feat;
+
+        let job06_name = "cen-uat-caj-smol-job06";
+        let job06_result_raw =
+            range TimeGeneratedBin_Chile from bin(startQuery, 15m) to bin(endQuery, 15m) step 15m
+            | extend minuto = datetime_part("minute", TimeGeneratedBin_Chile)
+            | extend valorEsperado = iff(minuto == 0, 3, 0)
+            | project TimeGeneratedBin_Chile, valorEsperado
+            | join kind=leftouter (
+                fn_src_cen_uat_ws_smol("ContainerAppSystemLogs_CL", startQuery, endQuery + 5m)
+                | where JobName_s == job06_name
+                | where Log_s contains "has successfully completed"
+                | summarize valorReal = count() by TimeGeneratedBin_Chile = bin(TimeGenerated, 15m)
+            ) on TimeGeneratedBin_Chile
+            | extend valorReal = coalesce(valorReal, 0)
+            | extend status = case(
+                valorEsperado == 0, "n",
+                valorReal == 0 and valorEsperado > 0, "a",
+                valorReal > valorEsperado, "s",
+                valorReal < ceiling(0.85 * valorEsperado), "w",
+                "n")
+            | extend Job06_Opt = strcat(status, valorReal, "/", valorEsperado)
+            | project TimeGeneratedBin_Chile, Job06_Opt;
+
+        let job06_result =
+            job06_result_raw
+            | extend is_last = TimeGeneratedBin_Chile == lastSlot
+            | extend Job06_Opt = iif(is_last and (Job06_Opt startswith "w" or Job06_Opt startswith "a"), strcat("n", substring(Job06_Opt, 1)), Job06_Opt)
+            | project TimeGeneratedBin_Chile, Job06_Opt;
+
+        let job07_name = "cen-uat-caj-smol-job07";
+        let job07_result_raw =
+            range TimeGeneratedBin_Chile from bin(startQuery, 15m) to bin(endQuery, 15m) step 15m
+            | extend minuto = datetime_part("minute", TimeGeneratedBin_Chile)
+            | extend dow = toint(dayofweek(TimeGeneratedBin_Chile) / 1d)
+            | extend valorEsperado = iff(dow in (2,4,5) and minuto in (15,30,45), 1, 0)
+            | project TimeGeneratedBin_Chile, valorEsperado
+            | join kind=leftouter (
+                fn_src_cen_uat_ws_smol("ContainerAppSystemLogs_CL", startQuery, endQuery + 2m)
+                | where JobName_s == job07_name
+                | where Log_s contains "has successfully completed"
+                | summarize valorReal = count() by TimeGeneratedBin_Chile = bin(TimeGenerated, 15m)
+            ) on TimeGeneratedBin_Chile
+            | extend valorReal = coalesce(valorReal, 0)
+            | extend status = case(
+                valorEsperado == 0, "n",
+                valorReal == 0 and valorEsperado > 0, "a",
+                valorReal > valorEsperado, "s",
+                valorReal < ceiling(0.85 * valorEsperado), "w",
+                "n")
+            | extend Job07_Train = strcat(status, valorReal, "/", valorEsperado)
+            | project TimeGeneratedBin_Chile, Job07_Train;
+
+        let job07_result =
+            job07_result_raw
+            | extend is_last = TimeGeneratedBin_Chile == lastSlot
+            | extend Job07_Train = iif(is_last and (Job07_Train startswith "w" or Job07_Train startswith "a"), strcat("n", substring(Job07_Train, 1)), Job07_Train)
+            | project TimeGeneratedBin_Chile, Job07_Train;
+
+        result_0105
+        | join kind=fullouter job06_result on TimeGeneratedBin_Chile
+        | join kind=fullouter job07_result on TimeGeneratedBin_Chile
+        | project TimeGeneratedBin_Chile, Job01_PI_10m, Job02_PI_1h, Job03_MT, Job04_Merge, Job05_Feat, Job06_Opt, Job07_Train
+    };
+
+    let jobs_status =
+        statusDominiosSmol()
+        | summarize arg_max(TimeGeneratedBin_Chile, *);
+
+    let jobs_resumen =
+        jobs_status
+        | extend
+            j01 = substring(Job01_PI_10m, 0, 1),
+            j02 = substring(Job02_PI_1h, 0, 1),
+            j03 = substring(Job03_MT, 0, 1),
+            j04 = substring(Job04_Merge, 0, 1),
+            j05 = substring(Job05_Feat, 0, 1),
+            j06 = substring(Job06_Opt, 0, 1),
+            j07 = substring(Job07_Train, 0, 1)
+        | extend Procesamiento_Features = case(
+                j01 == "a" or j02 == "a" or j03 == "a" or j04 == "a" or j05 == "a", "Critical",
+                j01 == "w" or j02 == "w" or j03 == "w" or j04 == "w" or j05 == "w", "Warning",
+                "OK")
+        | extend Recomendacion = case(
+                j06 == "a", "Critical",
+                j06 == "w", "Warning",
+                "OK")
+        | extend Reentrenamiento = case(
+                j07 == "a" or j07 == "w", "Warning",
+                "OK")
+        | project Procesamiento_Features, Recomendacion, Reentrenamiento;
+
+    alerta_pi_mt
+    | extend k = 1
+    | join kind=inner (jobs_resumen | extend k = 1) on k
+    | project-away k
+    | project Ingesta_PISystem, Ingesta_MT, Procesamiento_Features, Recomendacion, Reentrenamiento
+};
