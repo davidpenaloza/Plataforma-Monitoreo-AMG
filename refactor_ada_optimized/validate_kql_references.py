@@ -44,6 +44,11 @@ REQUIRED_DOMAINS = {
     "fn_uat_mlp_svfn_dom_transformacion_status",
     "fn_uat_mlp_svfn_dom_prediccion_status",
     "fn_uat_mlp_svfn_dom_resumen_status",
+    "fn_uat_ant_mtsa_dom_resumen_status",
+    "fn_uat_ant_mtsa_dom_frontend_status",
+    "fn_uat_ant_mtsa_dom_procesamiento_status",
+    "fn_uat_ant_mtsa_dom_regla_negocio_status",
+    "fn_uat_ant_mtsa_dom_ingestas_status",
 }
 
 REQUIRED_WRAPPERS = {
@@ -70,6 +75,12 @@ REQUIRED_WRAPPERS = {
     "var_mlp_svfn_tags.kql",
     "var_mlp_svfn_transformacion.kql",
     "var_mlp_svfn_prediccion.kql",
+    "var_ant_mtsa_frontend.kql",
+    "var_ant_mtsa_procesamiento.kql",
+    "var_ant_mtsa_regla_negocio.kql",
+    "var_ant_mtsa_ingestas.kql",
+    "var_ant_mtsa_global.kql",
+    "var_ant_mtsa_resumen.kql",
 }
 
 ALLOWED_NON_DOMAIN_WRAPPERS = {

@@ -1,0 +1,16 @@
+// Resumen operativo para Mineral Tracking SIRO Ácido - Antucoya UAT.
+let lookback = 2h;
+let ingestas = fn_uat_ant_mtsa_dom_ingestas_status(ago(lookback), now());
+let regla_negocio = fn_uat_ant_mtsa_dom_regla_negocio_status(ago(lookback), now());
+let procesamiento = fn_uat_ant_mtsa_dom_procesamiento_status(ago(lookback), now());
+let frontend = fn_uat_ant_mtsa_dom_frontend_status(ago(lookback), now());
+
+union
+    (ingestas | project orden = 1, producto = "Ingestas", estado = print_0),
+    (regla_negocio | project orden = 2, producto = "Regla_Negocio", estado = print_0),
+    (procesamiento | project orden = 3, producto = "Procesamiento_job", estado = print_0),
+    (frontend | project orden = 4, producto = "Frontend", estado = print_0)
+| extend color = fn_mon_status_to_color(estado)
+| extend icono = iff(estado == "ALERT", "🔴", "🟢")
+| project orden, producto, estado, color, icono
+| order by orden asc

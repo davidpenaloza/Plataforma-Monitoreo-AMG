@@ -1,0 +1,19 @@
+let fn_uat_ant_mtsa_dom_procesamiento_status = (startTime:datetime, endTime:datetime) {
+    let base_procesamiento =
+        fn_src_ant_uat_ws_dataplatform("DatabricksJobs", startTime, endTime)
+        | where tostring(parse_json(RequestParams).jobId) == "610886078807192"
+        | where tostring(parse_json(RequestParams).taskKey) contains "forecast_agglomeration_v2"
+        | where ActionName in ("runSucceeded", "runFailed");
+
+    let intervalos = toscalar(
+        base_procesamiento
+        | extend Intervalo = bin(TimeGenerated, 30m)
+        | summarize Fallidos = countif(ActionName == "runFailed") by Intervalo
+        | where datetime_part("minute", Intervalo) == 0
+        | summarize TotalIntervalos = count(), IntervalosFallidos = countif(Fallidos > 0)
+        | project status = iff(IntervalosFallidos == TotalIntervalos and TotalIntervalos > 0, "ALERT", "OK")
+    );
+
+    let status = coalesce(intervalos, "OK");
+    print status
+};

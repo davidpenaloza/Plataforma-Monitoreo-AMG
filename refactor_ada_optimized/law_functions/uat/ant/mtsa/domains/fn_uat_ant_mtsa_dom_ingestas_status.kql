@@ -1,0 +1,36 @@
+let fn_uat_ant_mtsa_dom_ingestas_status = (startTime:datetime, endTime:datetime) {
+    let logs_base = materialize(
+        fn_src_ant_uat_ws_dataplatform("Logs_ANT_Mineral_Tracking_datamart_CL", startTime, endTime)
+    );
+
+    let planta_detenida = toscalar(
+        logs_base
+        | where origin_module == "Tags PI System" and subtype == "Comportamiento Planta"
+        | where isnotempty(detail)
+        | extend mensaje_a_consultar = parse_json(detail)
+        | extend es_detencion_val = tostring(mensaje_a_consultar.es_detencion)
+        | summarize arg_max(TimeGenerated, es_detencion_val) by tabla = tostring(mensaje_a_consultar.tabla)
+        | summarize Planta_Detenida = countif(es_detencion_val contains "true")
+        | project planta_detenida = Planta_Detenida > 0
+    );
+
+    let notpii_status = toscalar(
+        logs_base
+        | where origin_module == "Tabla PI System" and isnotempty(detail)
+        | top 1 by TimeGenerated
+        | project status = iff(alertar == true, "ALERT", "OK")
+    );
+
+    let jigsaw_status = toscalar(
+        logs_base
+        | where origin_module == "Tablas Jigsaw" and isnotempty(detail)
+        | extend estado_raw = iff(alertar == true, "ALERT", "OK")
+        | summarize arg_max(TimeGenerated, estado_raw) by tabla = tostring(parse_json(detail).table)
+        | summarize HayAlertas = countif(estado_raw == "ALERT")
+        | project status = iff(HayAlertas > 0, "ALERT", "OK")
+    );
+
+    let notpii_final = iff(coalesce(planta_detenida, false), "OK", coalesce(notpii_status, "OK"));
+    let status = iff(notpii_final == "ALERT" or coalesce(jigsaw_status, "OK") == "ALERT", "ALERT", "OK");
+    print status
+};
