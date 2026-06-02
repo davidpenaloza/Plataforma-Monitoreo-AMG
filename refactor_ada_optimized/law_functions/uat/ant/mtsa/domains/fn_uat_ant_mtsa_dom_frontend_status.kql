@@ -1,0 +1,11 @@
+let fn_uat_ant_mtsa_dom_frontend_status = (startTime:datetime, endTime:datetime) {
+    let disponibilidad = toscalar(
+        fn_src_ant_uat_ws_dataplatform("AppServiceHTTPLogs", endTime - 1d, endTime)
+        | summarize TotalRequests = count(), SuccessfulRequests = countif(Result == "Success")
+        | extend AvailabilityPct = iff(TotalRequests == 0, 100.0, 100.0 * todouble(SuccessfulRequests) / todouble(TotalRequests))
+        | project AvailabilityPct
+    );
+
+    let status = iff(coalesce(disponibilidad, 100.0) < 85.0, "ALERT", "OK");
+    print status
+};

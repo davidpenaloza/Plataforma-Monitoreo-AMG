@@ -1,0 +1,1 @@
+fn_uat_ant_mtsa_dom_resumen_status(bin($__timeFrom, 1m), bin($__timeTo, 1m))
