@@ -1,0 +1,4 @@
+let fn_uat_cen_minco_sm_dom_ingesta_mt_status = (startTime:datetime, endTime:datetime) {
+    let status = toscalar(fn_uat_cen_minco_sm_status_dimensions(startTime, endTime) | project Ingesta_MT);
+    print status
+};

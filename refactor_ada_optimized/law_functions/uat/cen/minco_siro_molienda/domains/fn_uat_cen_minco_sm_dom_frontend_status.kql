@@ -1,8 +1,0 @@
-let fn_uat_cen_minco_sm_dom_frontend_status = (startTime:datetime, endTime:datetime) {
-    let app_filter = toscalar(fn_uat_cen_minco_sm_catalog() | where Key == "frontend_app_contains" | project Value);
-    let status = toscalar(
-        fn_uat_cen_minco_sm_frontend_availability(endTime - 1d, endTime, 85.0, app_filter)
-        | project Status
-    );
-    print status = coalesce(status, "OK")
-};
