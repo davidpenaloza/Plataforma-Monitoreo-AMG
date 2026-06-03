@@ -12,15 +12,17 @@ El modelo queda alineado con las dimensiones exportadas en `paneles_minco_siro_m
 
 Los estados expuestos para Grafana/Power Automate son `OK`, `Warning` o `Critical`. Las dimensiones de ingesta que en el panel legacy aparecían como `Alertar`/`No Alertar` se normalizan a `Critical`/`OK` para mantener la misma semántica visual que las otras dimensiones.
 
+La lógica de negocio no queda concentrada en `fn_uat_cen_minco_sm_status_dimensions`: esa función solo orquesta resultados. Las reglas específicas viven en helpers separados por responsabilidad (`eval_ingesta_pisystem`, `eval_ingesta_mt` y `eval_smol_jobs`) para reducir riesgo de cambios cruzados.
+
 ## 2) Mapa técnico
 
 | Dimensión | Wrapper Grafana | Dominio | Helper / sources |
 |---|---|---|---|
-| Ingesta_PISystem | `grafana_wrappers/uat/cen/minco_siro_molienda/var_cen_minco_sm_ingesta_pisystem.kql` | `fn_uat_cen_minco_sm_dom_ingesta_pisystem_status` | `fn_uat_cen_minco_sm_status_dimensions`, `fn_src_cen_dev_ws_pisystem` |
-| Ingesta_MT | `grafana_wrappers/uat/cen/minco_siro_molienda/var_cen_minco_sm_ingesta_mt.kql` | `fn_uat_cen_minco_sm_dom_ingesta_mt_status` | `fn_uat_cen_minco_sm_status_dimensions`, `fn_src_cen_dev_ws_mt` |
-| Procesamiento_Features | `grafana_wrappers/uat/cen/minco_siro_molienda/var_cen_minco_sm_procesamiento_features.kql` | `fn_uat_cen_minco_sm_dom_procesamiento_features_status` | `fn_uat_cen_minco_sm_status_dimensions`, `fn_src_cen_uat_ws_smol` |
-| Recomendacion | `grafana_wrappers/uat/cen/minco_siro_molienda/var_cen_minco_sm_recomendacion.kql` | `fn_uat_cen_minco_sm_dom_recomendacion_status` | `fn_uat_cen_minco_sm_status_dimensions`, `fn_src_cen_uat_ws_smol` |
-| Reentrenamiento | `grafana_wrappers/uat/cen/minco_siro_molienda/var_cen_minco_sm_reentrenamiento.kql` | `fn_uat_cen_minco_sm_dom_reentrenamiento_status` | `fn_uat_cen_minco_sm_status_dimensions`, `fn_src_cen_uat_ws_smol` |
+| Ingesta_PISystem | `grafana_wrappers/uat/cen/minco_siro_molienda/var_cen_minco_sm_ingesta_pisystem.kql` | `fn_uat_cen_minco_sm_dom_ingesta_pisystem_status` | `fn_uat_cen_minco_sm_eval_ingesta_pisystem`, `fn_uat_cen_minco_sm_status_dimensions`, `fn_src_cen_dev_ws_pisystem` |
+| Ingesta_MT | `grafana_wrappers/uat/cen/minco_siro_molienda/var_cen_minco_sm_ingesta_mt.kql` | `fn_uat_cen_minco_sm_dom_ingesta_mt_status` | `fn_uat_cen_minco_sm_eval_ingesta_mt`, `fn_uat_cen_minco_sm_status_dimensions`, `fn_src_cen_dev_ws_mt` |
+| Procesamiento_Features | `grafana_wrappers/uat/cen/minco_siro_molienda/var_cen_minco_sm_procesamiento_features.kql` | `fn_uat_cen_minco_sm_dom_procesamiento_features_status` | `fn_uat_cen_minco_sm_eval_smol_jobs`, `fn_uat_cen_minco_sm_status_dimensions`, `fn_src_cen_uat_ws_smol` |
+| Recomendacion | `grafana_wrappers/uat/cen/minco_siro_molienda/var_cen_minco_sm_recomendacion.kql` | `fn_uat_cen_minco_sm_dom_recomendacion_status` | `fn_uat_cen_minco_sm_eval_smol_jobs`, `fn_uat_cen_minco_sm_status_dimensions`, `fn_src_cen_uat_ws_smol` |
+| Reentrenamiento | `grafana_wrappers/uat/cen/minco_siro_molienda/var_cen_minco_sm_reentrenamiento.kql` | `fn_uat_cen_minco_sm_dom_reentrenamiento_status` | `fn_uat_cen_minco_sm_eval_smol_jobs`, `fn_uat_cen_minco_sm_status_dimensions`, `fn_src_cen_uat_ws_smol` |
 
 ## 3) Orden de despliegue LAW
 
@@ -28,7 +30,10 @@ Los estados expuestos para Grafana/Power Automate son `OK`, `Warning` o `Critica
    - `fn_src_cen_dev_ws_pisystem`
    - `fn_src_cen_dev_ws_mt`
    - `fn_src_cen_uat_ws_smol`
-2. Helper:
+2. Helpers:
+   - `fn_uat_cen_minco_sm_eval_ingesta_pisystem`
+   - `fn_uat_cen_minco_sm_eval_ingesta_mt`
+   - `fn_uat_cen_minco_sm_eval_smol_jobs`
    - `fn_uat_cen_minco_sm_status_dimensions`
 3. Dominios:
    - `fn_uat_cen_minco_sm_dom_ingesta_pisystem_status`
