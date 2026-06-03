@@ -1,0 +1,9 @@
+let fn_src_cen_dev_ws_mt = (sourceType:string, startTime:datetime, endTime:datetime) {
+  union isfuzzy=true
+    (
+      workspace("/subscriptions/0d996eb2-802f-4ef8-8ae6-d385c74da7e6/resourceGroups/CEN-DEV-RG-MT/providers/Microsoft.OperationalInsights/workspaces/cen-dev-law-mt").table("ContainerAppSystemLogs_CL")
+      | where TimeGenerated between (startTime .. endTime)
+      | where sourceType == "ContainerAppSystemLogs_CL"
+      | extend source_table = "ContainerAppSystemLogs_CL"
+    )
+};
