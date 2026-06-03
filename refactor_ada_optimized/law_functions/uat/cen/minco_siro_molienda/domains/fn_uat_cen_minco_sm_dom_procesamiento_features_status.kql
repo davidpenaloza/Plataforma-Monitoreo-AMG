@@ -1,0 +1,30 @@
+let fn_uat_cen_minco_sm_dom_procesamiento_features_status = (startTime:datetime, endTime:datetime) {
+    let jobs_status =
+        fn_uat_cen_minco_sm_jobs_status_detail(startTime, endTime)
+        | summarize arg_max(TimeGeneratedBin_Chile, *);
+
+    let jobs_resumen =
+        jobs_status
+        | extend
+            j01 = substring(Job01_PI_10m, 0, 1),
+            j02 = substring(Job02_PI_1h, 0, 1),
+            j03 = substring(Job03_MT, 0, 1),
+            j04 = substring(Job04_Merge, 0, 1),
+            j05 = substring(Job05_Feat, 0, 1),
+            j06 = substring(Job06_Opt, 0, 1),
+            j07 = substring(Job07_Train, 0, 1)
+        | extend Procesamiento_Features = case(
+                j01 == "a" or j02 == "a" or j03 == "a" or j04 == "a" or j05 == "a", "Critical",
+                j01 == "w" or j02 == "w" or j03 == "w" or j04 == "w" or j05 == "w", "Warning",
+                "OK")
+        | extend Recomendacion = case(
+                j06 == "a", "Critical",
+                j06 == "w", "Warning",
+                "OK")
+        | extend Reentrenamiento = case(
+                j07 == "a" or j07 == "w", "Warning",
+                "OK");
+
+    let status = toscalar(jobs_resumen | project Procesamiento_Features);
+    print status
+};
