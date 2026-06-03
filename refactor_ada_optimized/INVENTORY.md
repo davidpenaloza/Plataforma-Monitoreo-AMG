@@ -95,11 +95,6 @@ El mismo layout aplica para `law_functions_body_only/prd/mlp/`.
   - `fn_prd_mlp_ssag_eval_desfase`
   - `fn_prd_mlp_ssag_eval_ejecucion`
 
-- MINCO Siro Molienda CEN UAT:
-  - `fn_uat_cen_minco_sm_eval_ingesta_pisystem`
-  - `fn_uat_cen_minco_sm_eval_ingesta_mt`
-  - `fn_uat_cen_minco_sm_eval_smol_jobs`
-  - `fn_uat_cen_minco_sm_status_dimensions`
 
 ## 4) Sources activos
 
