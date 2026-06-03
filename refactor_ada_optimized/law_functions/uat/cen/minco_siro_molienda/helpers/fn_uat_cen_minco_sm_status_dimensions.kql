@@ -1,0 +1,19 @@
+let fn_uat_cen_minco_sm_status_dimensions = (startTime:datetime, endTime:datetime) {
+    let pi =
+        fn_uat_cen_minco_sm_eval_ingesta_pisystem(startTime, endTime)
+        | extend k = 1;
+
+    let mt =
+        fn_uat_cen_minco_sm_eval_ingesta_mt(startTime, endTime)
+        | extend k = 1;
+
+    let smol_jobs =
+        fn_uat_cen_minco_sm_eval_smol_jobs(startTime, endTime)
+        | extend k = 1;
+
+    pi
+    | join kind=inner mt on k
+    | join kind=inner smol_jobs on k
+    | project-away k, k1, k2
+    | project Ingesta_PISystem, Ingesta_MT, Procesamiento_Features, Recomendacion, Reentrenamiento
+};
