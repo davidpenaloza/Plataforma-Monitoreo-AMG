@@ -1,0 +1,1 @@
+fn_uat_cen_minco_sm_dom_ingesta_mt_status(bin($__timeFrom, 1m), bin($__timeTo, 1m))

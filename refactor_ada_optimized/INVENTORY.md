@@ -27,7 +27,7 @@ El mismo layout aplica para `law_functions_body_only/prd/mlp/`.
 - SIROSAG: `var_mlp_sirosag_resumen`.
 - SVFN UAT: `var_mlp_svfn_resumen`, `var_mlp_svfn_global`, `var_mlp_svfn_fuente_notpii_interpolated`, `var_mlp_svfn_tags`, `var_mlp_svfn_transformacion`, `var_mlp_svfn_prediccion`.
 - MTSA ANT UAT: `var_ant_mtsa_resumen`, `var_ant_mtsa_global`, `var_ant_mtsa_ingestas`, `var_ant_mtsa_regla_negocio`, `var_ant_mtsa_procesamiento`, `var_ant_mtsa_frontend`.
-- MINCO Siro Molienda CEN UAT: `var_cen_minco_sm_resumen`, `var_cen_minco_sm_global`, `var_cen_minco_sm_ingestas`, `var_cen_minco_sm_regla_negocio`, `var_cen_minco_sm_procesamiento`, `var_cen_minco_sm_frontend`.
+- MINCO Siro Molienda CEN UAT: `var_cen_minco_sm_ingesta_pisystem`, `var_cen_minco_sm_ingesta_mt`, `var_cen_minco_sm_procesamiento_features`, `var_cen_minco_sm_recomendacion`, `var_cen_minco_sm_reentrenamiento`.
 
 ## 2) Domains activos
 
@@ -68,13 +68,13 @@ El mismo layout aplica para `law_functions_body_only/prd/mlp/`.
   - `fn_uat_ant_mtsa_dom_frontend_status`
   - `fn_uat_ant_mtsa_dom_resumen_status`
 
-- MINCO Siro Molienda CEN UAT (6):
-  - `fn_uat_cen_minco_sm_dom_ingestas_status`
-  - `fn_uat_cen_minco_sm_dom_regla_negocio_status`
-  - `fn_uat_cen_minco_sm_dom_procesamiento_status`
-  - `fn_uat_cen_minco_sm_dom_frontend_status`
-  - `fn_uat_cen_minco_sm_dom_resumen_status`
-  - `fn_uat_cen_minco_sm_dom_global_status`
+- MINCO Siro Molienda CEN UAT (6; 5 públicos + 1 rollup interno):
+  - `fn_uat_cen_minco_sm_dom_ingesta_pisystem_status`
+  - `fn_uat_cen_minco_sm_dom_ingesta_mt_status`
+  - `fn_uat_cen_minco_sm_dom_smol_dimensions_status`
+  - `fn_uat_cen_minco_sm_dom_procesamiento_features_status`
+  - `fn_uat_cen_minco_sm_dom_recomendacion_status`
+  - `fn_uat_cen_minco_sm_dom_reentrenamiento_status`
 
 ## 3) Helpers activos
 
@@ -97,11 +97,11 @@ El mismo layout aplica para `law_functions_body_only/prd/mlp/`.
   - `fn_prd_mlp_ssag_eval_ejecucion`
 
 - MINCO Siro Molienda CEN UAT:
-  - `fn_uat_cen_minco_sm_catalog`
-  - `fn_uat_cen_minco_sm_alert_from_datamart`
-  - `fn_uat_cen_minco_sm_databricks_task_status`
-  - `fn_uat_cen_minco_sm_frontend_availability`
-  - `fn_uat_cen_minco_sm_status_rollup`
+  - `fn_uat_cen_minco_sm_jobs_0105_status_detail`
+  - `fn_uat_cen_minco_sm_job06_status_detail`
+  - `fn_uat_cen_minco_sm_job07_status_detail`
+  - `fn_uat_cen_minco_sm_jobs_status_detail`
+
 
 ## 4) Sources activos
 
@@ -127,6 +127,9 @@ El mismo layout aplica para `law_functions_body_only/prd/mlp/`.
 - `fn_src_mlp_uat_ws_notpii_interpolated(sourceType, startTime, endTime)`
 - `fn_src_ant_uat_ws_dataplatform(sourceType, startTime, endTime)`
 - `fn_src_cen_uat_ws_dataplatform(sourceType, startTime, endTime)`
+- `fn_src_cen_dev_ws_pisystem(sourceType, startTime, endTime)`
+- `fn_src_cen_dev_ws_mt(sourceType, startTime, endTime)`
+- `fn_src_cen_uat_ws_smol(sourceType, startTime, endTime)`
 
 ## 5) Regla de limpieza
 

@@ -1,0 +1,7 @@
+let fn_uat_cen_minco_sm_dom_recomendacion_status = (startTime:datetime, endTime:datetime) {
+    let status = toscalar(
+        fn_uat_cen_minco_sm_dom_smol_dimensions_status(startTime, endTime)
+        | project Recomendacion
+    );
+    print status
+};

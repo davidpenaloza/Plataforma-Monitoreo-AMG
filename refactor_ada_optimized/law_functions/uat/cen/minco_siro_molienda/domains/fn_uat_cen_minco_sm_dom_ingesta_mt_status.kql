@@ -1,0 +1,25 @@
+let fn_uat_cen_minco_sm_dom_ingesta_mt_status = (startTime:datetime, endTime:datetime) {
+    let endQuery = bin(endTime, 1m);
+    let mt_job_name = "cen-dev-caj-mt-job01";
+    let mt_slot = 15m;
+    let mt_grace = 12m;
+    let mt_ingest_lag = 3m;
+    let mt_curr_slot = bin(endQuery, 15m);
+    let mt_grace_end = mt_curr_slot + mt_grace;
+
+    let status = toscalar(
+        fn_src_cen_dev_ws_mt("ContainerAppSystemLogs_CL", mt_curr_slot, mt_curr_slot + mt_slot + mt_ingest_lag)
+        | where JobName_s == mt_job_name
+        | where Log_s has "has successfully completed"
+        | summarize completions = count()
+        | extend completions = toint(coalesce(completions, 0))
+        | extend dentro_gracia_o_lag = endQuery < (mt_grace_end + mt_ingest_lag)
+        | extend estado_mt = case(
+            dentro_gracia_o_lag, "n",
+            completions == 0, "a",
+            "n")
+        | project Ingesta_MT = iff(estado_mt == "a", "Critical", "OK")
+    );
+
+    print status
+};

@@ -1,0 +1,8 @@
+let fn_uat_cen_minco_sm_jobs_status_detail = (startTime:datetime, endTime:datetime) {
+    let jobs_0105 = fn_uat_cen_minco_sm_jobs_0105_status_detail(startTime, endTime);
+    let lastSlot = toscalar(jobs_0105 | summarize max(TimeGeneratedBin_Chile));
+    jobs_0105
+    | join kind=fullouter (fn_uat_cen_minco_sm_job06_status_detail(startTime, endTime, lastSlot)) on TimeGeneratedBin_Chile
+    | join kind=fullouter (fn_uat_cen_minco_sm_job07_status_detail(startTime, endTime, lastSlot)) on TimeGeneratedBin_Chile
+    | project TimeGeneratedBin_Chile, Job01_PI_10m, Job02_PI_1h, Job03_MT, Job04_Merge, Job05_Feat, Job06_Opt, Job07_Train
+};
