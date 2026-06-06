@@ -68,9 +68,10 @@ El mismo layout aplica para `law_functions_body_only/prd/mlp/`.
   - `fn_uat_ant_mtsa_dom_frontend_status`
   - `fn_uat_ant_mtsa_dom_resumen_status`
 
-- MINCO Siro Molienda CEN UAT (5):
+- MINCO Siro Molienda CEN UAT (6; 5 públicos + 1 rollup interno):
   - `fn_uat_cen_minco_sm_dom_ingesta_pisystem_status`
   - `fn_uat_cen_minco_sm_dom_ingesta_mt_status`
+  - `fn_uat_cen_minco_sm_dom_smol_dimensions_status`
   - `fn_uat_cen_minco_sm_dom_procesamiento_features_status`
   - `fn_uat_cen_minco_sm_dom_recomendacion_status`
   - `fn_uat_cen_minco_sm_dom_reentrenamiento_status`
@@ -96,6 +97,9 @@ El mismo layout aplica para `law_functions_body_only/prd/mlp/`.
   - `fn_prd_mlp_ssag_eval_ejecucion`
 
 - MINCO Siro Molienda CEN UAT:
+  - `fn_uat_cen_minco_sm_jobs_0105_status_detail`
+  - `fn_uat_cen_minco_sm_job06_status_detail`
+  - `fn_uat_cen_minco_sm_job07_status_detail`
   - `fn_uat_cen_minco_sm_jobs_status_detail`
 
 

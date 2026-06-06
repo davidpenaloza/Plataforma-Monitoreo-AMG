@@ -1,0 +1,26 @@
+let fn_uat_cen_minco_sm_job06_status_detail = (startTime:datetime, endTime:datetime, lastSlot:datetime) {
+    let startQuery = bin(startTime, 1m);
+    let endQuery = bin(endTime, 1m);
+    let job_name = "cen-uat-caj-smol-job06";
+    range TimeGeneratedBin_Chile from bin(startQuery, 15m) to bin(endQuery, 15m) step 15m
+    | extend minuto = datetime_part("minute", TimeGeneratedBin_Chile)
+    | extend valorEsperado = iff(minuto == 0, 3, 0)
+    | project TimeGeneratedBin_Chile, valorEsperado
+    | join kind=leftouter (
+        fn_src_cen_uat_ws_smol("ContainerAppSystemLogs_CL", startQuery, endQuery + 5m)
+        | where JobName_s == job_name
+        | where Log_s contains "has successfully completed"
+        | summarize valorReal = count() by TimeGeneratedBin_Chile = bin(TimeGenerated, 15m)
+    ) on TimeGeneratedBin_Chile
+    | extend valorReal = coalesce(valorReal, 0)
+    | extend status = case(
+        valorEsperado == 0, "n",
+        valorReal == 0 and valorEsperado > 0, "a",
+        valorReal > valorEsperado, "s",
+        valorReal < ceiling(0.85 * valorEsperado), "w",
+        "n")
+    | extend Job06_Opt = strcat(status, valorReal, "/", valorEsperado)
+    | extend is_last = TimeGeneratedBin_Chile == lastSlot
+    | extend Job06_Opt = iif(is_last and (Job06_Opt startswith "w" or Job06_Opt startswith "a"), strcat("n", substring(Job06_Opt, 1)), Job06_Opt)
+    | project TimeGeneratedBin_Chile, Job06_Opt
+};

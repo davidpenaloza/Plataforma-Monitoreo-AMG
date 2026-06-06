@@ -3,9 +3,10 @@ let startTime = ago(3h);
 let endTime = now();
 let ingesta_pisystem = toscalar(fn_uat_cen_minco_sm_dom_ingesta_pisystem_status(startTime, endTime));
 let ingesta_mt = toscalar(fn_uat_cen_minco_sm_dom_ingesta_mt_status(startTime, endTime));
-let procesamiento_features = toscalar(fn_uat_cen_minco_sm_dom_procesamiento_features_status(startTime, endTime));
-let recomendacion = toscalar(fn_uat_cen_minco_sm_dom_recomendacion_status(startTime, endTime));
-let reentrenamiento = toscalar(fn_uat_cen_minco_sm_dom_reentrenamiento_status(startTime, endTime));
+let smol_dimensions = materialize(fn_uat_cen_minco_sm_dom_smol_dimensions_status(startTime, endTime));
+let procesamiento_features = toscalar(smol_dimensions | project Procesamiento_Features);
+let recomendacion = toscalar(smol_dimensions | project Recomendacion);
+let reentrenamiento = toscalar(smol_dimensions | project Reentrenamiento);
 
 union
     (print orden = 1, producto = "Ingesta_PISystem", estado = ingesta_pisystem),
