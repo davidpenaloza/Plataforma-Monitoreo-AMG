@@ -748,7 +748,11 @@
         },
         "refresh": 2,
         "regex": "",
-        "type": "query"
+        "type": "query",
+        "datasource": {
+          "type": "grafana-azure-monitor-datasource",
+          "uid": "eetf6c2xjxukgd"
+        }
       },
       {
         "current": {
@@ -772,7 +776,11 @@
         },
         "refresh": 2,
         "regex": "",
-        "type": "query"
+        "type": "query",
+        "datasource": {
+          "type": "grafana-azure-monitor-datasource",
+          "uid": "eetf6c2xjxukgd"
+        }
       },
       {
         "current": {
@@ -796,7 +804,11 @@
         },
         "refresh": 2,
         "regex": "",
-        "type": "query"
+        "type": "query",
+        "datasource": {
+          "type": "grafana-azure-monitor-datasource",
+          "uid": "eetf6c2xjxukgd"
+        }
       },
       {
         "current": {
@@ -820,7 +832,11 @@
         },
         "refresh": 2,
         "regex": "",
-        "type": "query"
+        "type": "query",
+        "datasource": {
+          "type": "grafana-azure-monitor-datasource",
+          "uid": "eetf6c2xjxukgd"
+        }
       },
       {
         "current": {
@@ -844,7 +860,11 @@
         },
         "refresh": 2,
         "regex": "",
-        "type": "query"
+        "type": "query",
+        "datasource": {
+          "type": "grafana-azure-monitor-datasource",
+          "uid": "eetf6c2xjxukgd"
+        }
       },
       {
         "current": {
@@ -868,7 +888,11 @@
         },
         "refresh": 2,
         "regex": "",
-        "type": "query"
+        "type": "query",
+        "datasource": {
+          "type": "grafana-azure-monitor-datasource",
+          "uid": "eetf6c2xjxukgd"
+        }
       },
       {
         "current": {
@@ -892,7 +916,11 @@
         },
         "refresh": 2,
         "regex": "",
-        "type": "query"
+        "type": "query",
+        "datasource": {
+          "type": "grafana-azure-monitor-datasource",
+          "uid": "eetf6c2xjxukgd"
+        }
       },
       {
         "current": {
@@ -916,7 +944,11 @@
         },
         "refresh": 2,
         "regex": "",
-        "type": "query"
+        "type": "query",
+        "datasource": {
+          "type": "grafana-azure-monitor-datasource",
+          "uid": "eetf6c2xjxukgd"
+        }
       },
       {
         "current": {
@@ -940,7 +972,11 @@
         },
         "refresh": 2,
         "regex": "",
-        "type": "query"
+        "type": "query",
+        "datasource": {
+          "type": "grafana-azure-monitor-datasource",
+          "uid": "eetf6c2xjxukgd"
+        }
       },
       {
         "current": {
@@ -964,7 +1000,11 @@
         },
         "refresh": 2,
         "regex": "",
-        "type": "query"
+        "type": "query",
+        "datasource": {
+          "type": "grafana-azure-monitor-datasource",
+          "uid": "eetf6c2xjxukgd"
+        }
       },
       {
         "current": {
@@ -988,7 +1028,11 @@
         },
         "refresh": 2,
         "regex": "",
-        "type": "query"
+        "type": "query",
+        "datasource": {
+          "type": "grafana-azure-monitor-datasource",
+          "uid": "eetf6c2xjxukgd"
+        }
       },
       {
         "current": {
@@ -1012,7 +1056,11 @@
         },
         "refresh": 2,
         "regex": "",
-        "type": "query"
+        "type": "query",
+        "datasource": {
+          "type": "grafana-azure-monitor-datasource",
+          "uid": "eetf6c2xjxukgd"
+        }
       },
       {
         "current": {
@@ -1036,7 +1084,11 @@
         },
         "refresh": 2,
         "regex": "",
-        "type": "query"
+        "type": "query",
+        "datasource": {
+          "type": "grafana-azure-monitor-datasource",
+          "uid": "eetf6c2xjxukgd"
+        }
       },
       {
         "current": {
@@ -1060,7 +1112,11 @@
         },
         "refresh": 2,
         "regex": "",
-        "type": "query"
+        "type": "query",
+        "datasource": {
+          "type": "grafana-azure-monitor-datasource",
+          "uid": "eetf6c2xjxukgd"
+        }
       },
       {
         "current": {
@@ -1084,7 +1140,11 @@
         },
         "refresh": 2,
         "regex": "",
-        "type": "query"
+        "type": "query",
+        "datasource": {
+          "type": "grafana-azure-monitor-datasource",
+          "uid": "eetf6c2xjxukgd"
+        }
       },
       {
         "current": {
@@ -1108,7 +1168,11 @@
         },
         "refresh": 2,
         "regex": "",
-        "type": "query"
+        "type": "query",
+        "datasource": {
+          "type": "grafana-azure-monitor-datasource",
+          "uid": "eetf6c2xjxukgd"
+        }
       },
       {
         "current": {
@@ -1132,7 +1196,11 @@
         },
         "refresh": 2,
         "regex": "",
-        "type": "query"
+        "type": "query",
+        "datasource": {
+          "type": "grafana-azure-monitor-datasource",
+          "uid": "eetf6c2xjxukgd"
+        }
       },
       {
         "current": {
@@ -1156,7 +1224,11 @@
         },
         "refresh": 2,
         "regex": "",
-        "type": "query"
+        "type": "query",
+        "datasource": {
+          "type": "grafana-azure-monitor-datasource",
+          "uid": "eetf6c2xjxukgd"
+        }
       },
       {
         "current": {
@@ -1180,7 +1252,11 @@
         },
         "refresh": 2,
         "regex": "",
-        "type": "query"
+        "type": "query",
+        "datasource": {
+          "type": "grafana-azure-monitor-datasource",
+          "uid": "eetf6c2xjxukgd"
+        }
       },
       {
         "current": {
@@ -1204,7 +1280,11 @@
         },
         "refresh": 2,
         "regex": "",
-        "type": "query"
+        "type": "query",
+        "datasource": {
+          "type": "grafana-azure-monitor-datasource",
+          "uid": "eetf6c2xjxukgd"
+        }
       },
       {
         "current": {
@@ -1228,7 +1308,11 @@
         },
         "refresh": 2,
         "regex": "",
-        "type": "query"
+        "type": "query",
+        "datasource": {
+          "type": "grafana-azure-monitor-datasource",
+          "uid": "eetf6c2xjxukgd"
+        }
       },
       {
         "current": {
@@ -1252,7 +1336,11 @@
         },
         "refresh": 2,
         "regex": "",
-        "type": "query"
+        "type": "query",
+        "datasource": {
+          "type": "grafana-azure-monitor-datasource",
+          "uid": "eetf6c2xjxukgd"
+        }
       },
       {
         "current": {
@@ -1276,7 +1364,11 @@
         },
         "refresh": 2,
         "regex": "",
-        "type": "query"
+        "type": "query",
+        "datasource": {
+          "type": "grafana-azure-monitor-datasource",
+          "uid": "eetf6c2xjxukgd"
+        }
       },
       {
         "current": {
@@ -1301,7 +1393,11 @@
         },
         "refresh": 2,
         "regex": "",
-        "type": "query"
+        "type": "query",
+        "datasource": {
+          "type": "grafana-azure-monitor-datasource",
+          "uid": "eetf6c2xjxukgd"
+        }
       },
       {
         "current": {
@@ -1326,7 +1422,11 @@
         },
         "refresh": 2,
         "regex": "",
-        "type": "query"
+        "type": "query",
+        "datasource": {
+          "type": "grafana-azure-monitor-datasource",
+          "uid": "eetf6c2xjxukgd"
+        }
       },
       {
         "current": {
@@ -1351,7 +1451,11 @@
         },
         "refresh": 2,
         "regex": "",
-        "type": "query"
+        "type": "query",
+        "datasource": {
+          "type": "grafana-azure-monitor-datasource",
+          "uid": "eetf6c2xjxukgd"
+        }
       },
       {
         "current": {
@@ -1376,7 +1480,11 @@
         },
         "refresh": 2,
         "regex": "",
-        "type": "query"
+        "type": "query",
+        "datasource": {
+          "type": "grafana-azure-monitor-datasource",
+          "uid": "eetf6c2xjxukgd"
+        }
       },
       {
         "current": {
@@ -1401,7 +1509,11 @@
         },
         "refresh": 2,
         "regex": "",
-        "type": "query"
+        "type": "query",
+        "datasource": {
+          "type": "grafana-azure-monitor-datasource",
+          "uid": "eetf6c2xjxukgd"
+        }
       },
       {
         "current": {
@@ -1426,7 +1538,11 @@
         },
         "refresh": 2,
         "regex": "",
-        "type": "query"
+        "type": "query",
+        "datasource": {
+          "type": "grafana-azure-monitor-datasource",
+          "uid": "eetf6c2xjxukgd"
+        }
       },
       {
         "current": {
@@ -1451,7 +1567,11 @@
         },
         "refresh": 2,
         "regex": "",
-        "type": "query"
+        "type": "query",
+        "datasource": {
+          "type": "grafana-azure-monitor-datasource",
+          "uid": "eetf6c2xjxukgd"
+        }
       },
       {
         "current": {
@@ -1476,7 +1596,11 @@
         },
         "refresh": 2,
         "regex": "",
-        "type": "query"
+        "type": "query",
+        "datasource": {
+          "type": "grafana-azure-monitor-datasource",
+          "uid": "eetf6c2xjxukgd"
+        }
       },
       {
         "current": {
@@ -1500,7 +1624,11 @@
         },
         "refresh": 2,
         "regex": "",
-        "type": "query"
+        "type": "query",
+        "datasource": {
+          "type": "grafana-azure-monitor-datasource",
+          "uid": "eetf6c2xjxukgd"
+        }
       },
       {
         "current": {
@@ -1524,7 +1652,11 @@
         },
         "refresh": 2,
         "regex": "",
-        "type": "query"
+        "type": "query",
+        "datasource": {
+          "type": "grafana-azure-monitor-datasource",
+          "uid": "eetf6c2xjxukgd"
+        }
       },
       {
         "current": {
@@ -1549,7 +1681,11 @@
         },
         "refresh": 2,
         "regex": "",
-        "type": "query"
+        "type": "query",
+        "datasource": {
+          "type": "grafana-azure-monitor-datasource",
+          "uid": "eetf6c2xjxukgd"
+        }
       },
       {
         "current": {
@@ -2056,5 +2192,5 @@
   "timezone": "browser",
   "title": "Plataforma Monitoreo CROSS Refactorizado",
   "uid": "plataforma-monitoreo-cross-refactor",
-  "version": 22
+  "version": 23
 }
