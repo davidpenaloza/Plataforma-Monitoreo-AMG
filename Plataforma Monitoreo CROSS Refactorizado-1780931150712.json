@@ -492,7 +492,7 @@
     }
   ],
   "preload": false,
-  "refresh": "",
+  "refresh": "5m",
   "schemaVersion": 41,
   "tags": [
     "monitoring",
@@ -2167,8 +2167,8 @@
     "to": "now"
   },
   "timepicker": {},
-  "timezone": "",
+  "timezone": "browser",
   "title": "Plataforma Monitoreo CROSS Refactorizado",
   "uid": "plataforma-monitoreo-cross-refactor",
-  "version": 19
+  "version": 22
 }
