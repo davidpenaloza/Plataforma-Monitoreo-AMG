@@ -1,0 +1,7 @@
+let fn_uat_mlp_siropotencia_adbjobsmap = () { datatable(jobName:string, jobId:string)
+[
+    "[MLP]_[SIRO_POTENCIA]_Calculo_KPI_Adopcion", "831175976601308",
+    "[MLP]_[SIRO_POTENCIA]_Calculo_Peaks", "692852489310635",
+    "[MLP]_[SIRO_POTENCIA]_Calculo_Threshold", "372510059563770",
+    "[MLP]_[SIRO_POTENCIA]_Generacion_Recomendaciones", "1109417636937848"
+]};

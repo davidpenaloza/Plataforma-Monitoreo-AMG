@@ -1,0 +1,22 @@
+let fn_uat_mlp_siropotencia_errorescustom_status = (startTime:datetime, endTime:datetime) {
+    let timeBins = view() { 
+    range TimeGeneratedBin from startTime to endTime step 1h
+    | extend TimeGeneratedBin = bin(TimeGeneratedBin, 1h)
+    };
+    let alertLogs = view () {
+        fn_src_mlp_uat_ws_sparklogging("SIRO_POTENCIA", startTime, endTime)
+            | where Message has '"alert": "true"'
+                and TimeGenerated >= startTime and TimeGenerated <= endTime
+            | order by TimeGenerated desc
+            | project Message, TimeGenerated
+            | extend TimeGeneratedBin = bin(TimeGenerated, 1h)
+            | summarize ErrorCount = count() by TimeGeneratedBin
+    };
+    timeBins
+        | join kind=fullouter (alertLogs) on TimeGeneratedBin
+        | project TimeGeneratedBin, ErrorCount
+        | extend ErrorCount = coalesce(ErrorCount, 0)
+        | order by TimeGeneratedBin desc
+        | take 1
+        | project Status = iff(ErrorCount > 0, 'ALERT', 'OK')
+};

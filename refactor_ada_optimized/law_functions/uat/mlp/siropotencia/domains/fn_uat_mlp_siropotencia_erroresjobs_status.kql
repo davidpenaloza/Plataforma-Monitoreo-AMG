@@ -1,0 +1,9 @@
+let fn_uat_mlp_siropotencia_erroresjobs_status = (startTime:datetime, endTime:datetime) {
+ fn_src_mlp_uat_ws_siropotencia_databricksjobs(sourceType = 'SIRO_POTENCIA', startTime, endTime)
+    | extend json_RequestParams=parse_json(RequestParams)
+    | mv-expand json_RequestParams
+    | extend jobId=tostring(json_RequestParams.jobId)
+    | join kind=inner (fn_uat_mlp_siropotencia_adbjobsmap) on $left.jobId == $right.jobId
+    | summarize  cantidad_errores = countif(ActionName == 'runFailed')
+    | project Status = iff(cantidad_errores > 0, 'ALERT', 'OK')
+};

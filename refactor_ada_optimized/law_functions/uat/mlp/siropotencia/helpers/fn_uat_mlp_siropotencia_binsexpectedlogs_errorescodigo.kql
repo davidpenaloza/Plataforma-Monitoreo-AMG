@@ -1,0 +1,13 @@
+let fn_uat_mlp_siropotencia_binsexpectedlogs_errorescodigo = (startTime:datetime, endTime:datetime) { 
+  range TimeGeneratedBin_Chile from startTime to endTime step 15m
+  | extend TimeGeneratedBin_Chile = datetime_utc_to_local(bin(TimeGeneratedBin_Chile, 15m), 'America/Santiago'),
+           expected_log_write_recommendations = 1,
+           expected_log_write_data_graph = 1,
+           expected_log_write_status = 1
+  | extend expected_log_write_threshold = iif(hourofday(TimeGeneratedBin_Chile) == 17 and datetime_part('minute', TimeGeneratedBin_Chile) == 0, 1, 0)
+  | extend lastFriday = iif(TimeGeneratedBin_Chile >= startofweek(TimeGeneratedBin_Chile) + 5d + 23h,
+                            startofweek(TimeGeneratedBin_Chile, 1) - 2d + 23h,
+                            startofweek(TimeGeneratedBin_Chile, 0) - 2d + 23h)
+  | extend expected_log_write_kpi = iif(TimeGeneratedBin_Chile == lastFriday, 1, 0)
+  | project-away lastFriday
+};

@@ -1,0 +1,20 @@
+fn_uat_mlp_siropotencia_front_status = (startTime:datetime, endTime:datetime) {
+let appServiceTable = fn_src_mlp_uat_ws_appservicehttps("ams-uat-dataplatform-as-pel-siro-potencia-frontend", startTime, endTime);
+let badRequestFront = view () {
+  appServiceTable
+  | where ScStatus >= 400
+  | take 1
+};
+let goodRequestFront = view () {
+  appServiceTable
+  | where ScStatus < 400
+  | take 1
+};
+let countGoodRequestFront = toscalar(goodRequestFront | count);
+let countBadRequestFront = toscalar(badRequestFront | count);
+let resultString = iff(countBadRequestFront > countGoodRequestFront, "ALERT", "OK");
+let resultTable = datatable(result: string)["ALERT", "OK"];
+resultTable
+| where result==resultString
+| project Status = result
+};

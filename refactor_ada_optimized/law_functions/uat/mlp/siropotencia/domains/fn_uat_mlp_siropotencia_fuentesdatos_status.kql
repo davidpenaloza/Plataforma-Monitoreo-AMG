@@ -1,0 +1,64 @@
+let fn_uat_mlp_siropotencia_fuentesdatos_status = (startTime:datetime, endTime:datetime) {
+let logs_SparkingLogging_SiroPot = fn_src_mlp_uat_ws_sparklogging('SIRO_POTENCIA', startTime, endTime);
+let pi_last_record = view () 
+{
+        logs_SparkingLogging_SiroPot
+                |where Message has '"log_load_data_notpii"'
+                and Message has '"alert": "false"'
+                | order by TimeGenerated desc
+                | project Message, TimeGenerated, fuente="Not Pii", descripcion="Datos Tags"
+                | take 1
+};
+let data_52_peaks = view () 
+{
+        logs_SparkingLogging_SiroPot
+                | where  Message has '"log_load_data_52_peaks"'
+                and Message has '"alert": "false"'
+                | order by TimeGenerated desc
+                | project Message, TimeGenerated, fuente="Archivo Manual", descripcion="Datos 52 peaks"
+                | take 1
+};
+let data_threshold = view () 
+{
+        logs_SparkingLogging_SiroPot
+                | where Message has '"log_load_data_threshold"'
+                and Message has '"alert": "false"'
+                | order by TimeGenerated desc
+                | project Message, TimeGenerated, fuente="Archivo Manual", descripcion="Datos threshold"
+                | take 1
+};
+let data_inputs = view () 
+{
+        logs_SparkingLogging_SiroPot
+                | where Message has '"log_load_data_inputs"'
+                and Message has '"alert": "false"'
+                | order by TimeGenerated desc
+                | project Message, TimeGenerated, fuente="Archivo Manual", descripcion="Datos input"
+                | take 1
+};
+let data_source_contants = view () 
+{
+        logs_SparkingLogging_SiroPot
+                | where Message has '"log_load_data_source_contants"'
+                and Message has '"alert": "false"'
+                | order by TimeGenerated desc
+                | project Message, TimeGenerated, fuente="Archivo Manual", descripcion="Datos source contants"
+                | take 1
+};
+let union_tables = view()
+{
+        union pi_last_record, data_52_peaks, data_threshold, data_inputs, data_source_contants
+};
+let format_tables = view() {
+	union_tables
+	| extend json_msg=parse_json(Message)
+	| extend ultimo_timestamp_fuente = todatetime(json_msg.timestamp),
+	        alertar = json_msg.alert,
+	        script_ejecutado = json_msg.root_python_path
+	| project descripcion, fuente, ultimo_timestamp_fuente, alertar, script_ejecutado
+};
+format_tables
+| project descripcion, fuente, ultimo_timestamp_fuente, alertar, script_ejecutado
+| summarize alertas_activas = countif(alertar == true)
+| project Status = iff(alertas_activas > 0, 'ALERT', 'OK')
+};
