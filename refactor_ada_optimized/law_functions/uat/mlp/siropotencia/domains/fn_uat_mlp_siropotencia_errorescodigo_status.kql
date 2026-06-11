@@ -1,0 +1,35 @@
+let fn_uat_mlp_siropotencia_errorescodigo_status = (startTime:datetime, endTime:datetime)  {
+let alertLogs = view () {
+    fn_src_mlp_uat_ws_sparklogging('SIRO_POTENCIA', startTime, endTime)
+        |where Message has '"alert": "false"'
+            and Message has_any ("log_write_recommendations", "log_write_data_graph", "log_write_status", "log_write_threshold", "log_write_kpi")
+        | order by TimeGenerated desc
+        | extend TimeGenerated = TimeGenerated + 2m // Agrego 2 minutos porque a veces queda fuera del rango la ejecución
+        | extend id_log = parse_json(Message).id, TimeGeneratedBin_Chile = datetime_utc_to_local(bin(TimeGenerated, 15m), 'America/Santiago')
+        | project TimeGeneratedBin_Chile, id_log
+        | summarize real_log_write_recommendations = count(id_log=="log_write_recommendations"),
+                    real_log_write_data_graph = count(id_log=="log_write_data_graph"),
+                    real_log_write_status = count(id_log=="log_write_status"),
+                    real_log_write_threshold = count(id_log=="log_write_threshold"),
+                    real_log_write_kpi = count(id_log=="log_write_kpi") by TimeGeneratedBin_Chile
+};
+let bins_expected =fn_uat_mlp_siropotencia_binsexpectedlogs_errorescodigo(startTime, endTime);
+bins_expected| join kind=leftouter (alertLogs) on TimeGeneratedBin_Chile
+| take toscalar(bins_expected | count) - 1 // no se utiliza la ultima columna porque puede quedar fuera de rango
+    | extend real_log_write_recommendations = coalesce(real_log_write_recommendations, 0),
+                    real_log_write_data_graph = coalesce(real_log_write_data_graph, 0),
+                    real_log_write_status = coalesce(real_log_write_status, 0),
+                    real_log_write_threshold = coalesce(real_log_write_threshold, 0),
+                    real_log_write_kpi = coalesce(real_log_write_kpi, 0)
+    | extend    log_write_recommendations = real_log_write_recommendations - expected_log_write_recommendations,
+                log_write_data_graph = real_log_write_data_graph - expected_log_write_data_graph,
+                log_write_status = real_log_write_status - expected_log_write_status,
+                log_write_threshold = real_log_write_threshold - expected_log_write_threshold,
+                log_write_kpi = real_log_write_kpi - expected_log_write_kpi
+    | extend TimeGeneratedBin_UTC = datetime_local_to_utc(TimeGeneratedBin_Chile, 'America/Santiago')
+    | project TimeGeneratedBin_UTC, log_write_recommendations, log_write_data_graph, log_write_status, log_write_threshold, log_write_kpi
+    | take 3
+    | extend total_errores_codigo = log_write_recommendations + log_write_data_graph + log_write_status + log_write_threshold + log_write_kpi
+    | summarize alertas_activas = countif(total_errores_codigo == true)
+    | project Status = iff(alertas_activas > 0, 'ALERT', 'OK')
+};
